@@ -6,7 +6,7 @@
   "inputs": [
     {
       "id": "disc1",
-      "label": "Twin Snakes USA revision 0 \u2014 Disc 1",
+      "label": "Twin Snakes USA revision 0 — Disc 1 (.rvz, .gcz, .iso, .gcm)",
       "role": "disc",
       "formats": [
         {
@@ -34,7 +34,7 @@
     },
     {
       "id": "disc2",
-      "label": "Twin Snakes USA revision 0 \u2014 Disc 2",
+      "label": "Twin Snakes USA revision 0 — Disc 2 (.rvz, .gcz, .iso, .gcm)",
       "role": "disc",
       "formats": [
         {

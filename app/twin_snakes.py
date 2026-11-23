@@ -137,7 +137,9 @@ def tool(runtime, name):
 def normalize_disc(path, cache, runtime, log):
     path = path.resolve(strict=True)
     extension = path.suffix.lower()
-    if extension in ('.iso', '.gcm') and not path.name.lower().endswith('.nkit.iso'):
+    if path.name.lower().endswith(('.nkit.iso', '.nkit.gcz')):
+        raise DiscError('Choose a full ISO, GCM, RVZ or GCZ dump. NKit is not supported.')
+    if extension in ('.iso', '.gcm'):
         return path
     if extension not in ('.rvz', '.gcz'):
         raise DiscError('Choose ISO, GCM, RVZ or GCZ. NKit and CISO are not supported yet.')
