@@ -1,4 +1,5 @@
 [
+  ".gitattributes",
   ".gitignore",
   "AGENTS.md",
   "CMakeLists.txt",
@@ -14,11 +15,16 @@
   "app/twin_snakes.py",
   "src/launcher.cpp",
   "scripts/bootstrap.py",
+  "scripts/benchmark_boot.py",
   "scripts/build_runtime.py",
   "scripts/check_manifest.py",
   "scripts/check_publication.py",
+  "scripts/package_windows.py",
+  "patches/moderngekko-auto-gamepad.patch",
+  "patches/recompcore-auto-gamepad.patch",
   "docs/BUILDING.md",
   "docs/ROADMAP.md",
   "docs/STATUS.md",
+  "docs/PERFORMANCE.md",
   "tests/test_discs.py"
 ]

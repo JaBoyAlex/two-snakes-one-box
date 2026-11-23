@@ -1,0 +1,75 @@
+"""Stage a development package from explicit, local toolchain inputs."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import zipfile
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--runtime', type=Path, default=ROOT / '.local/runtime')
+    parser.add_argument('--launcher', type=Path, default=ROOT / '.local/build/launcher/TwinSnakes.exe')
+    parser.add_argument('--tools', type=Path, required=True, help='Directory holding python, cmake, ninja and llvm-mingw')
+    parser.add_argument('--output', type=Path, default=ROOT / 'dist')
+    parser.add_argument('--version', default='0.1.0-dev')
+    args = parser.parse_args()
+    if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?', args.version):
+        parser.error('--version must be a version such as 0.1.0-dev')
+    for required in [args.launcher, args.runtime / 'moderngekko-run.exe', args.runtime / 'dolrecomp.exe',
+                     args.runtime / 'dolphin-tool.exe', args.tools / 'python/python.exe',
+                     args.tools / 'cmake/bin/cmake.exe', args.tools / 'ninja/ninja.exe',
+                     args.tools / 'llvm-mingw/bin/clang.exe']:
+        if not required.is_file():
+            raise SystemExit(f'Missing package input: {required}')
+    stage = ROOT / '.local/packages' / args.version
+    if stage.exists():
+        raise SystemExit('Use a new package version or remove the old staging directory after reviewing it.')
+    stage.mkdir(parents=True)
+    for name in ['README.md', 'LICENSE', 'THIRD_PARTY.md', 'recomplauncher.json',
+                 'dependencies.lock.json', 'supported-builds.json', 'app/discs.py', 'app/twin_snakes.py']:
+        destination = stage / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / name, destination)
+    shutil.copytree(ROOT / 'docs', stage / 'docs')
+    shutil.copy2(args.launcher, stage / 'TwinSnakes.exe')
+    shutil.copytree(args.runtime, stage / 'runtime')
+    shutil.copytree(args.tools / 'python', stage / 'python')
+    for name in ['cmake', 'ninja', 'llvm-mingw']:
+        shutil.copytree(args.tools / name, stage / 'tools' / name)
+    (stage / 'portable.txt').touch()
+    # No generated module, ROM, memory-card or player-data directory may enter
+    # the archive. Runtime resources and source SDK are explicit inputs above.
+    blocked_suffixes = {'.iso', '.gcm', '.rvz', '.gcz', '.dol', '.rel', '.gci', '.raw', '.sav'}
+    for path in stage.rglob('*'):
+        if path.is_file() and (path.suffix.lower() in blocked_suffixes or '_recomp.dll' in path.name):
+            raise SystemExit(f'Private content in package staging: {path.relative_to(stage)}')
+    manifest = {}
+    for path in sorted(stage.rglob('*')):
+        if path.is_file():
+            with path.open('rb') as stream:
+                manifest[path.relative_to(stage).as_posix()] = hashlib.file_digest(stream, 'sha256').hexdigest()
+    (stage / 'package-files.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+    # Verify the same executable named by prepare and start can find its Python
+    # runtime and entry point; this does not constitute a gameplay check.
+    subprocess.run([str(stage / 'TwinSnakes.exe'), '--help'], check=True)
+    args.output.mkdir(parents=True, exist_ok=True)
+    archive = args.output / f'TwinSnakes-Recomp-v{args.version}-Windows-x64.zip'
+    with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
+        for path in sorted(stage.rglob('*')):
+            if path.is_file():
+                bundle.write(path, path.relative_to(stage).as_posix())
+    with archive.open('rb') as stream:
+        checksum = hashlib.file_digest(stream, 'sha256').hexdigest()
+    archive.with_suffix('.zip.sha256').write_text(f'{checksum}  {archive.name}\n', encoding='ascii')
+    print(f'Packaged development tooling: {archive}')
+    print('Do not publish until runtime notices/source availability and the clean-install/gameplay checks have been reviewed.')
+
+
+if __name__ == '__main__':
+    main()

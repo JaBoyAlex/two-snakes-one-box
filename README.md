@@ -2,7 +2,7 @@
 
 A work-in-progress native recompilation project for **Metal Gear Solid: The Twin Snakes** on GameCube, with local-disc setup and RecompLauncher integration.
 
-**Development status: tooling bring-up. No playable or stable release has been verified.**
+**Development status: the Windows prototype reaches the title screen and currently runs below normal speed.**
 
 Players will provide both **USA revision 0** discs matching `supported-builds.json`. Commercial game data and generated game code are never included in this repository or release downloads.
 
@@ -27,11 +27,13 @@ This is a recompilation with a hardware compatibility runtime. Native code gener
 
 See [BUILDING.md](docs/BUILDING.md) for the source workflow, [STATUS.md](docs/STATUS.md) for measured results and [ROADMAP.md](docs/ROADMAP.md) for release gates.
 
+The Windows prototype automatically maps the first recognized SDL gamepad to port 1 when there is no custom GameCube controller profile. There is a keyboard fallback. Physical play and reconnect still need verification.
+
 Windows x64 is the first target. Linux and macOS packaging will follow verified builds on those platforms.
 
 ## Resolution and frame rate
 
-The first compatibility target preserves the game's original timing and aspect ratio. Higher internal rendering resolutions and fullscreen output at the monitor's desktop resolution are planned. An unlocked frame rate is a later gameplay change that must preserve movement speed, animation, physics, audio and cutscene timing. No unlocked-frame-rate support is claimed yet.
+The first compatibility target preserves the game's original timing and aspect ratio. Higher internal rendering resolutions and fullscreen output at the monitor's desktop resolution are planned. Uncapped rendering is a later update that must preserve movement speed, animation, physics, audio and cutscene timing. NVIDIA Reflex, DLSS and DLAA are optional experiments after baseline play is stable. See [PERFORMANCE.md](docs/PERFORMANCE.md) for the current measurements and tool comparisons.
 
 ## Files and saves
 

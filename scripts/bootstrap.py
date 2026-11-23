@@ -12,6 +12,11 @@ def main():
     source.parent.mkdir(parents=True, exist_ok=True)
     if not source.exists():
         subprocess.run(['git', 'clone', '--no-checkout', lock['url'], str(source)], check=True)
+    if subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip() == lock['commit']:
+        ready = subprocess.check_output(['git', '-C', str(source), 'submodule', 'status', '--recursive'], text=True)
+        if ready and all(line.startswith(' ') for line in ready.splitlines()):
+            print('Pinned source dependencies are already checked out.')
+            return
     if subprocess.check_output(['git', '-C', str(source), 'status', '--porcelain', '--untracked-files=no'], text=True).strip():
         raise SystemExit('Upstream checkout has local changes; refusing to replace them.')
     subprocess.run(['git', '-C', str(source), 'fetch', 'origin', lock['commit']], check=True)

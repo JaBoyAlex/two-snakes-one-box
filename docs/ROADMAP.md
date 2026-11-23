@@ -10,6 +10,7 @@
 ## 2. Gameplay compatibility
 
 - Verify controls, rumble, analog inputs, menus, loading and room transitions.
+- Verify that a controller connected before startup works on port 1 without setup, and that disconnecting and reconnecting it after boot restores input.
 - Verify codec conversations, movies, music and sound effects against the original timing.
 - Verify memory-card creation, save/load, process restart and update persistence.
 - Verify both discs, the disc transition, boss encounters and a complete playthrough.
@@ -36,7 +37,13 @@
 - Keep the original frame-rate mode available.
 - Test fixed 60/120/144 Hz and variable refresh without changing game speed or audio timing.
 - Expose an unlocked option in RecompLauncher only after those tests pass.
+- Validate that world simulation, game timers, DSP/audio mixing, dialogue and movies advance at the same rate with render caps of 60, 120 and 144 Hz and with the cap removed. Report actual game-rendered frames separately from interpolation or generated frames.
 
-## 6. Other platforms and extras
+## 6. Optional PC graphics features
+
+- Evaluate Reflex after presentation pacing is stable. Measure input-to-present latency with the feature on and off on supported hardware.
+- Evaluate DLSS Super Resolution and DLAA if the renderer can supply valid scene color, depth, motion vectors and frame history resets. Check camera cuts, HUD, movies and effects for ghosting. Keep a baseline display path for other GPUs.
+
+## 7. Other platforms and extras
 
 Linux/Steam Deck and macOS need native builds and hardware validation. Recomp Achievements is a later integration once reliable gameplay events are known.

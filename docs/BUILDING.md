@@ -15,4 +15,4 @@ The builder writes private disc-derived files under the chosen data directory. F
 
 `scripts/bootstrap.py` fetches the pinned upstream source trees. `scripts/build_runtime.py` compiles the recompiler, runner and disc conversion tool, then stages the runtime and the source needed to compile game modules. No retail game files are needed to build the tools.
 
-The local game build requires CMake, Ninja and a C compiler. A packaged player release will include a managed toolchain; the development workflow currently uses tools on PATH. Packaging is not yet a clean-machine installation guarantee.
+The local game build requires CMake, Ninja and a C compiler. `scripts/package_windows.py --tools PATH` can bundle explicit local copies of Python, CMake, Ninja and llvm-mingw with the compiled launcher/runtime, so setup needs no tool downloads or developer installation. Supply official tool distributions with their licenses. Packaging is not yet a clean-machine installation guarantee; runtime redistributables, complete notices and corresponding-source availability must be reviewed before a public binary release.

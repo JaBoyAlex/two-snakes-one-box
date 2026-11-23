@@ -9,6 +9,14 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def apply_patch(source, name):
+    patch = ROOT / 'patches' / name
+    command = ['git', '-C', str(source), 'apply']
+    if subprocess.run([*command, '--reverse', '--check', str(patch)], capture_output=True).returncode:
+        subprocess.run([*command, '--check', str(patch)], check=True)
+        subprocess.run([*command, str(patch)], check=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--source', type=Path, default=ROOT / '.local/sources/ModernGekko')
@@ -22,6 +30,8 @@ def main():
         revision = subprocess.check_output(['git', '-C', str(directory), 'rev-parse', 'HEAD'], text=True).strip()
         if revision != expected:
             raise SystemExit(f'Source revision does not match dependencies.lock.json: {directory.name}')
+    apply_patch(source, 'moderngekko-auto-gamepad.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-auto-gamepad.patch')
     subprocess.run(['cmake', '-S', str(source), '-B', str(build), '-G', 'Ninja',
                     '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_TESTING=OFF',
                     f'-DPython3_EXECUTABLE={os.sys.executable}',
@@ -36,6 +46,8 @@ def main():
     for target in targets:
         binary_name = 'DolphinTool' if os.name == 'nt' and target == 'dolphin-tool' else target
         matches = list(build.rglob(binary_name + extension))
+        if not matches and os.name == 'nt' and target == 'dolphin-tool':
+            matches = list((source / 'Binary').rglob(binary_name + extension))
         if len(matches) != 1:
             raise SystemExit(f'Expected exactly one built {target}, found {len(matches)}')
         shutil.copy2(matches[0], output / (target + extension))
@@ -52,6 +64,8 @@ def main():
     licenses = output / 'licenses'
     licenses.mkdir(exist_ok=True)
     for directory, name in [(source, 'ModernGekko'), (dolphin, 'RecompCore'), (dolphin / 'DolRecomp', 'DolRecomp')]:
+        if (directory / 'LICENSES').is_dir():
+            shutil.copytree(directory / 'LICENSES', licenses / name, dirs_exist_ok=True)
         for license_path in directory.glob('COPYING*'):
             shutil.copy2(license_path, licenses / f'{name}-{license_path.name}')
         for license_path in directory.glob('LICENSE*'):

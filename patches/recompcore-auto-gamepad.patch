@@ -1,0 +1,131 @@
+diff --git a/Source/Core/Core/HW/GCPad.cpp b/Source/Core/Core/HW/GCPad.cpp
+index 188882c58a..c4a263b4dc 100644
+--- a/Source/Core/Core/HW/GCPad.cpp
++++ b/Source/Core/Core/HW/GCPad.cpp
+@@ -3,15 +3,87 @@
+ 
+ #include "Core/HW/GCPad.h"
+ 
++#include <algorithm>
++#include <cstdio>
++
+ #include "Common/Common.h"
++#include "Common/FileUtil.h"
++#include "Common/IniFile.h"
+ #include "Core/HW/GCPadEmu.h"
+ #include "InputCommon/ControllerEmu/ControlGroup/ControlGroup.h"
++#include "InputCommon/ControllerEmu/ControllerEmu.h"
+ #include "InputCommon/GCPadStatus.h"
+ #include "InputCommon/InputConfig.h"
+ 
+ namespace Pad
+ {
+ static InputConfig s_config("GCPadNew", _trans("Pad"), "GCPad", "Pad");
++static bool s_auto_gamepad_enabled = false;
++static Common::EventHook s_auto_gamepad_hook;
++
++void SetAutoGamepadEnabled(bool enabled)
++{
++  s_auto_gamepad_enabled = enabled;
++}
++
++static void UpdateDefaultGamepad()
++{
++  if (!s_auto_gamepad_enabled ||
++      File::Exists(File::GetUserPath(D_CONFIG_IDX) + "GCPadNew.ini"))
++    return;
++
++  auto* pad = s_config.GetController(0);
++  const auto lock = ControllerEmu::EmulatedController::GetStateLock();
++  const auto selected = pad->GetDefaultDevice();
++
++  const auto devices = g_controller_interface.GetAllDevices();
++  const auto device = std::ranges::find_if(devices, [](const auto &candidate) {
++    return candidate->GetSource() == "SDL" && candidate->IsValid() &&
++           candidate->FindInput("Button S") && candidate->FindInput("Start") &&
++           candidate->FindInput("Left X+");
++  });
++  if (device == devices.end()) {
++    if (selected.source == "SDL" || !pad->IsDefaultDeviceConnected()) {
++      pad->SetDefaultDevice(ciface::Core::DeviceQualifier{});
++      pad->LoadDefaults(g_controller_interface);
++      pad->UpdateReferences(g_controller_interface);
++      std::fprintf(stderr, "[input] Using default keyboard controls\n");
++    }
++    return;
++  }
++
++  Common::IniFile::Section mapping;
++  mapping.Set("Device", (*device)->GetQualifiedName());
++  mapping.Set("Buttons/A", "`Button S`");
++  mapping.Set("Buttons/B", "`Button E`");
++  mapping.Set("Buttons/X", "`Button W`");
++  mapping.Set("Buttons/Y", "`Button N`");
++  mapping.Set("Buttons/Z", "`Shoulder R`");
++  mapping.Set("Buttons/Start", "Start");
++  mapping.Set("Main Stick/Up", "`Left Y+`");
++  mapping.Set("Main Stick/Down", "`Left Y-`");
++  mapping.Set("Main Stick/Left", "`Left X-`");
++  mapping.Set("Main Stick/Right", "`Left X+`");
++  mapping.Set("Main Stick/Calibration", "100.00");
++  mapping.Set("C-Stick/Up", "`Right Y+`");
++  mapping.Set("C-Stick/Down", "`Right Y-`");
++  mapping.Set("C-Stick/Left", "`Right X-`");
++  mapping.Set("C-Stick/Right", "`Right X+`");
++  mapping.Set("C-Stick/Calibration", "100.00");
++  mapping.Set("Triggers/L", "`Trigger L` > 0.9");
++  mapping.Set("Triggers/R", "`Trigger R` > 0.9");
++  mapping.Set("Triggers/L-Analog", "`Trigger L`");
++  mapping.Set("Triggers/R-Analog", "`Trigger R`");
++  mapping.Set("D-Pad/Up", "`Pad N`");
++  mapping.Set("D-Pad/Down", "`Pad S`");
++  mapping.Set("D-Pad/Left", "`Pad W`");
++  mapping.Set("D-Pad/Right", "`Pad E`");
++  mapping.Set("Rumble/Motor", "`Motor L` | `Motor R`");
++  pad->LoadConfig(&mapping);
++  pad->UpdateReferences(g_controller_interface);
++  std::fprintf(stderr, "[input] Port 1: %s\n", (*device)->GetQualifiedName().c_str());
++}
++
+ InputConfig* GetConfig()
+ {
+   return &s_config;
+@@ -19,6 +91,7 @@ InputConfig* GetConfig()
+ 
+ void Shutdown()
+ {
++  s_auto_gamepad_hook.reset();
+   s_config.UnregisterHotplugCallback();
+ 
+   s_config.ClearControllers();
+@@ -34,13 +107,15 @@ void Initialize()
+ 
+   s_config.RegisterHotplugCallback();
+ 
+-  // Load the saved controller config
+-  s_config.LoadConfig();
++  if (s_auto_gamepad_enabled)
++    s_auto_gamepad_hook = g_controller_interface.RegisterDevicesChangedCallback(UpdateDefaultGamepad);
++  LoadConfig();
+ }
+ 
+ void LoadConfig()
+ {
+-  s_config.LoadConfig();
++  if (!s_config.LoadConfig())
++    UpdateDefaultGamepad();
+ }
+ 
+ void GenerateDynamicInputTextures()
+diff --git a/Source/Core/Core/HW/GCPad.h b/Source/Core/Core/HW/GCPad.h
+index 0ed5ff5d54..6624ab534c 100644
+--- a/Source/Core/Core/HW/GCPad.h
++++ b/Source/Core/Core/HW/GCPad.h
+@@ -18,6 +18,7 @@ class ControlGroup;
+ namespace Pad
+ {
+ void Shutdown();
++void SetAutoGamepadEnabled(bool enabled);
+ void Initialize();
+ void LoadConfig();
+ void GenerateDynamicInputTextures();

@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from discs import DiscError, inspect_iso, validate_pair
 
 ROOT = Path(__file__).resolve().parents[1]
-BUILD_FORMAT = 1
+BUILD_FORMAT = 2
 
 
 class SetupError(Exception):
@@ -176,12 +176,12 @@ def build_disc(iso, disc, build, runtime, env, compiler, log):
         run([tool(runtime, 'dolrecomp'), 'extract', iso, extracted], log, code=20)
     if digest(extracted / 'sys/main.dol') != disc.dol_sha256:
         raise DiscError('Extracted executable does not match the selected disc.')
-    module_build = build / f'module{disc.number + 1}'
+    module_build = build / 'modules' / disc.dol_sha256[:16]
     suffix = '.dll' if os.name == 'nt' else ('.dylib' if sys.platform == 'darwin' else '.so')
     module = module_build / f'g{disc.game_id}_recomp{suffix}'
     if module.is_file():
         return extracted, module
-    generated_parent = build / f'generated{disc.number + 1}'
+    generated_parent = build / 'generated' / disc.dol_sha256[:16]
     run([tool(runtime, 'dolrecomp'), '--gamecube', extracted / 'sys/main.dol', generated_parent], log, env=env)
     generated = generated_parent / 'generated'
     shutil.copy2(extracted / 'sys/main.dol', generated / 'main.dol')
@@ -230,12 +230,12 @@ def prepare(args, runtime, data, log):
                 'recompiler': digest(tool(runtime, 'dolrecomp')),
                 'runner': digest(tool(runtime, 'moderngekko-run')),
                 'host': platform.machine(), 'compiler': compiler}
-    key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:32]
     build = cache / 'builds' / key
     completed = build / 'prepared.json'
     if completed.is_file():
         record = json.loads(completed.read_text(encoding='utf-8'))
-        if all((data / entry[field]).is_file() for entry in record['discs'] for field in ['dol', 'module']):
+        if record['identity'] == identity and all((data / entry[field]).is_file() for entry in record['discs'] for field in ['dol', 'module']):
             atomic_json(data / 'prepared.json', record)
             progress(1, 'Already built')
             return

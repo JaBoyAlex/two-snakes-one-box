@@ -1,0 +1,53 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1cbef59..bdf6184 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -479,6 +479,7 @@ if(MODERNGEKKO_ENABLE_DOLPHIN_RUNTIME)
+             MODERNGEKKO_PORTABLE_DEFAULT_GAME=1)
+     endif()
+     if(MODERNGEKKO_GAMECUBE_CONTROLLERS)
++        target_compile_definitions(moderngekko PRIVATE MODERNGEKKO_GAMECUBE_CONTROLLERS=1)
+         target_compile_definitions(moderngekko-run PRIVATE
+             MODERNGEKKO_GAMECUBE_CONTROLLERS=1)
+     endif()
+diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
+index f9b5405..5942bf0 100644
+--- a/src/runtime/dolphin_runtime.cpp
++++ b/src/runtime/dolphin_runtime.cpp
+@@ -10,6 +10,7 @@
+ #include "Core/Config/MainSettings.h"
+ #include "Core/Core.h"
+ #include "Core/HW/GBACore.h"
++#include "Core/HW/GCPad.h"
+ #include "Core/HW/Memmap.h"
+ #include "Core/Host.h"
+ #include "Core/NetPlay/NetPlayClient.h"
+@@ -108,6 +109,7 @@ PowerPC::CPUCore SelectCPUCore() {
+   return PowerPC::CPUCore::JIT64;
+ #endif
+ }
++
+ } // namespace
+ 
+ std::vector<std::string> Host_GetPreferredLocales() { return {}; }
+@@ -640,6 +642,10 @@ RuntimeCreateResult Runtime::Create(RuntimeConfig config) {
+   }
+ 
+   const WindowSystemInfo wsi = impl->platform->GetWindowSystemInfo();
++#ifdef MODERNGEKKO_GAMECUBE_CONTROLLERS
++  Pad::SetAutoGamepadEnabled(!s_external_ui_common && !impl->config.headless &&
++                             impl->config.automation.directory.empty());
++#endif
+   UICommon::InitControllers(wsi);
+   impl->controllers_initialized = true;
+   EnsureAutomationDirectories(impl->config.automation.directory);
+@@ -732,6 +738,9 @@ Runtime::~Runtime() {
+   m_impl->state_hook = {};
+   if (m_impl->controllers_initialized)
+     UICommon::ShutdownControllers();
++#ifdef MODERNGEKKO_GAMECUBE_CONTROLLERS
++  Pad::SetAutoGamepadEnabled(false);
++#endif
+   if (m_impl->ui_initialized)
+     UICommon::Shutdown();
+   std::lock_guard lock(s_runtime_mutex);
