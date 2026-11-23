@@ -1,0 +1,13 @@
+diff --git a/Source/Core/Core/HW/DVD/DVDInterfaceDisc.cpp b/Source/Core/Core/HW/DVD/DVDInterfaceDisc.cpp
+index 3f613a07fd..ca0bb8325b 100644
+--- a/Source/Core/Core/HW/DVD/DVDInterfaceDisc.cpp
++++ b/Source/Core/Core/HW/DVD/DVDInterfaceDisc.cpp
+@@ -57,6 +57,8 @@ void DVDInterface::SetDisc(std::unique_ptr<DiscIO::VolumeDisc> disc,
+ 
+   if (has_disc)
+   {
++    if (const auto disc_number = disc->GetDiscNumber())
++      INFO_LOG_FMT(DVDINTERFACE, "Mounted {} disc {}", disc->GetGameID(), *disc_number + 1);
+     m_disc_end_offset = GetDiscEndOffset(*disc);
+     if (disc->GetDataSizeType() != DiscIO::DataSizeType::Accurate)
+       WARN_LOG_FMT(DVDINTERFACE, "Unknown disc size, guessing {0} bytes", m_disc_end_offset);

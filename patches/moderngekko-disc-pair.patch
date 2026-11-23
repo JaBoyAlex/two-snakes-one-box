@@ -1,0 +1,132 @@
+diff --git a/include/moderngekko/runtime.hpp b/include/moderngekko/runtime.hpp
+index 0adc855..ed1e184 100644
+--- a/include/moderngekko/runtime.hpp
++++ b/include/moderngekko/runtime.hpp
+@@ -75,6 +75,8 @@ struct RuntimeConfig
+   // Boot straight into a savestate instead of from the title screen.
+   std::optional<std::filesystem::path> load_state_path;
+   AutomationSettings automation;
++  // The other extracted disc's sys/main.dol when booting a multi-disc game.
++  std::optional<std::filesystem::path> alternate_disc;
+ };
+ 
+ enum class RuntimeErrorCode
+diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
+index 3e161b5..2cd7216 100644
+--- a/src/runtime/dolphin_runtime.cpp
++++ b/src/runtime/dolphin_runtime.cpp
+@@ -19,6 +19,7 @@
+ #include "Core/PowerPC/StaticRecomp/StaticRecompModuleSource.h"
+ #include "Core/State.h"
+ #include "Core/System.h"
++#include "Core/HW/DVD/DVDInterface.h"
+ #include "DolphinNoGUI/Platform.h"
+ #include "InputCommon/ControllerInterface/Touch/InputOverrider.h"
+ #include "UICommon/UICommon.h"
+@@ -345,6 +346,10 @@ std::optional<RuntimeError> ApplyAutomationCommand(Runtime& runtime,
+     if (auto error = WriteAutomationMemory(command.address, command.data))
+       return error;
+     break;
++  case automation::CommandType::ChangeDisc:
++    if (!system.GetDVDInterface().AutoChangeDisc(Core::CPUThreadGuard{system}))
++      return RuntimeError{RuntimeErrorCode::InvalidState, "No alternate disc is configured"};
++    break;
+   case automation::CommandType::Stop:
+     runtime.RequestStop();
+     break;
+@@ -365,6 +370,7 @@ bool AutomationCommandNeedsReadyCore(automation::CommandType type)
+   case automation::CommandType::ReadMemory:
+   case automation::CommandType::WriteMemory:
+   case automation::CommandType::PadFrames:
++  case automation::CommandType::ChangeDisc:
+     return true;
+   case automation::CommandType::Pad:
+   case automation::CommandType::ClearPad:
+@@ -615,6 +621,8 @@ RuntimeCreateResult Runtime::Create(RuntimeConfig config) {
+     impl->ui_initialized = true;
+   }
+   Config::SetBase(Config::MAIN_FULLSCREEN, impl->config.fullscreen);
++  if (impl->config.alternate_disc)
++    Config::SetBase(Config::MAIN_AUTO_DISC_CHANGE, true);
+ 
+   if (impl->config.headless)
+     impl->platform = Platform::CreateHeadlessPlatform();
+@@ -767,19 +775,21 @@ RuntimeRunResult Runtime::Run() {
+                          "runtime is already running"}};
+ 
+   std::unique_ptr<BootParameters> boot;
++  std::vector<std::string> disc_paths{PathToString(m_impl->metadata.main_dol)};
++  if (m_impl->config.alternate_disc)
++    disc_paths.push_back(PathToString(*m_impl->config.alternate_disc));
+   {
+     std::lock_guard lock(s_runtime_mutex);
+     if (s_boot_session_data)
+       boot = BootParameters::GenerateFromFile(
+-          PathToString(m_impl->metadata.main_dol), std::move(*s_boot_session_data));
++          std::move(disc_paths), std::move(*s_boot_session_data));
+     else if (m_impl->config.load_state_path)
+       boot = BootParameters::GenerateFromFile(
+-          PathToString(m_impl->metadata.main_dol),
++          std::move(disc_paths),
+           BootSessionData(PathToString(*m_impl->config.load_state_path),
+                           DeleteSavestateAfterBoot::No));
+     else
+-      boot =
+-          BootParameters::GenerateFromFile(PathToString(m_impl->metadata.main_dol));
++      boot = BootParameters::GenerateFromFile(std::move(disc_paths));
+     s_boot_session_data.reset();
+   }
+   if (!boot) {
+diff --git a/tools/automation_protocol.cpp b/tools/automation_protocol.cpp
+index 25f4167..218bcf9 100644
+--- a/tools/automation_protocol.cpp
++++ b/tools/automation_protocol.cpp
+@@ -173,6 +173,8 @@ std::optional<CommandType> ParseCommandType(std::string_view value)
+     return CommandType::ReadMemory;
+   if (text == "write_memory")
+     return CommandType::WriteMemory;
++  if (text == "change_disc")
++    return CommandType::ChangeDisc;
+   if (text == "stop")
+     return CommandType::Stop;
+   return std::nullopt;
+@@ -501,6 +503,7 @@ bool ParseCommandFile(const std::filesystem::path& path, Command* command, std::
+     break;
+   case CommandType::Pause:
+   case CommandType::Resume:
++  case CommandType::ChangeDisc:
+   case CommandType::Stop:
+     break;
+   }
+diff --git a/tools/automation_protocol.hpp b/tools/automation_protocol.hpp
+index 2396f01..d754518 100644
+--- a/tools/automation_protocol.hpp
++++ b/tools/automation_protocol.hpp
+@@ -23,6 +23,7 @@ enum class CommandType
+   Screenshot,
+   ReadMemory,
+   WriteMemory,
++  ChangeDisc,
+   Stop,
+ };
+ 
+diff --git a/tools/moderngekko_run.cpp b/tools/moderngekko_run.cpp
+index 722bd6d..e09284b 100644
+--- a/tools/moderngekko_run.cpp
++++ b/tools/moderngekko_run.cpp
+@@ -392,6 +392,15 @@ int RunMain(int argc, char **argv) {
+         std::move(config), std::move(frontend_config), std::move(options));
+   }
+ 
++#ifdef _WIN32
++  if (const wchar_t* alternate = _wgetenv(L"MODERNGEKKO_ALTERNATE_DISC");
++      alternate && *alternate)
++#else
++  if (const char* alternate = std::getenv("MODERNGEKKO_ALTERNATE_DISC");
++      alternate && *alternate)
++#endif
++    config.alternate_disc = std::filesystem::path(alternate);
++
+   auto created = moderngekko::Runtime::Create(std::move(config));
+   if (!created) {
+     std::cerr << "initialization failed: " << created.error->message << '\n';

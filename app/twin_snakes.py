@@ -337,7 +337,13 @@ def play(args, runtime, data, log):
         command.append('--headless')
     if args.automation_dir:
         command += ['--automation-dir', args.automation_dir.resolve()]
-    run(command, log, code=25)
+    env = os.environ.copy()
+    env.pop('MODERNGEKKO_ALTERNATE_DISC', None)
+    if len(record['discs']) == 2:
+        alternate = data / record['discs'][2 - args.boot_disc]['dol']
+        if alternate.is_file():
+            env['MODERNGEKKO_ALTERNATE_DISC'] = str(alternate)
+    run(command, log, code=25, env=env)
 
 
 def main():
