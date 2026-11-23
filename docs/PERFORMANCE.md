@@ -32,6 +32,8 @@ On the first gameplay checkpoint, recompiling the native C module with `-O3 -mar
 
 A later gameplay checkpoint ran with Vulkan and normal audio output at a median `45.9` rendered FPS and `0.769` of original game speed over 48 samples. It ranged from `42.1` to `47.7` FPS and `0.706` to `0.801` of original speed. This was a separate checkpoint and provides no matched comparison to the earlier live capture. The telemetry launch disabled automatic controller selection, so the controller test used a regular windowed launch.
 
+The tester reported better pacing, including intervals close to normal speed, with major slowdowns still present. That agrees with the game clock measured during the live checkpoint.
+
 ```powershell
 python scripts/benchmark_boot.py --data .local/player --runner .local/runtime/moderngekko-run.exe
 ```
@@ -62,6 +64,10 @@ Our save-state slowdown reproduces with graphics and audio output disabled. The 
 
 On the supported revision, `mgso.rel` has 111,582 relocation records that affect executable instructions. Most materialize addresses within the same REL. There are also 8,238 branch relocations into the main DOL. Native dispatch needs to translate both guest addresses and control flow at the game's actual section placement. An address-range check alone cannot validate this, and fixed-address chunk hashes need to account for relocations before they can match loaded code.
 
-GekkoAOT is the first comparison because it already compiles secondary modules and translates between compile-time and live addresses. Its standalone ABI is different from the current runtime's. The local DOL passed its ABI probe. REL linking and gameplay are still unverified. For the current runtime, capture the live section addresses and compare relocation-adjusted code with guest memory before enabling native dispatch. Keep unverified code on the existing fallback, then compare the same gameplay and cutscene checkpoints against the JIT reference at the original game clock.
+The complete REL has the same SHA-256 on both supported discs. Its executable section starts at `0x7F0080EC` in the runtime's GameCube virtual memory region. Its zero-initialized data is allocated separately in main RAM. Applying the relocation records from the disc with that section placement reproduced all 4,540,760 executable bytes in seven saved checkpoints and a fresh headless boot of each disc. The fresh boots used separate profiles and stopped normally.
+
+The private candidate joins the boot executable and the relocated on-disc sections as compiler input. It extends the runtime's existing per-chunk verification to code in the virtual memory region. A one-chunk smoke test executed 6,746 native dispatches from the REL and shut down normally. Repeating the cold boot with a deliberately wrong expected hash rejected the chunk, executed zero native dispatches, and also shut down normally. Both tests used the JIT for code outside this chunk and measured a median `1.000` game speed in the opening sequence. The full build still needs matched gameplay and cutscene replays before the main module can be enabled in the builder.
+
+GekkoAOT already compiles secondary modules and translates between compile-time and live addresses. Its standalone ABI is different from the current runtime's. The local DOL passed its ABI probe. REL linking and gameplay are still unverified in that tool.
 
 Once normal-speed play is reliable, compare the original rendering cadence with a render loop that runs independently of the original simulation tick. Keep movie cadence and audio timing intact. NVIDIA's [Streamline integration guide](https://developer.nvidia.com/rtx/streamline/get-started) describes the timing markers for Reflex and the scene data needed for DLSS reconstruction. Revisit GPU features after those inputs can be measured and validated.
