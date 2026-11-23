@@ -1,0 +1,10 @@
+diff --git a/Data/Sys/GameSettings/GGSEA4r0.ini b/Data/Sys/GameSettings/GGSEA4r0.ini
+new file mode 100644
+--- /dev/null
++++ b/Data/Sys/GameSettings/GGSEA4r0.ini
+@@ -0,0 +1,5 @@
++# GGSEA4 - Metal Gear Solid: The Twin Snakes, USA revision 0
++
++[Core]
++# The dedicated idle thread has returned from OSYieldThread and is about to loop.
++StaticRecompIdlePC = 0x8004beec

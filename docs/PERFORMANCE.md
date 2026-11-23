@@ -8,6 +8,10 @@ A diagnostic comparison with video and audio output disabled measured a `1.00` m
 
 With unused mod callbacks removed, the C module measured `0.34` median speed over 15 samples and `0.33` over 11 samples on repeat. The repeat exited cleanly with a longer shutdown timeout. An experimental LLVM 19 Windows module with the same runtime measured `0.086` over 15 samples and stopped with Windows status `0xC0000409`. The LLVM candidate is excluded from the current build.
 
+Dispatch sampling showed that the GameCube scheduler dominated native dispatch while the dedicated idle thread repeatedly yielded. For USA revision 0, the runtime now calls its existing idle handler after that thread returns from `OSYieldThread`. This advances to the next scheduled hardware event using the original clock. The headless boot comparison measured `0.307` median speed over 23 samples before the idle fix and `0.999` over 20 samples with it, with normal shutdown on both runs. The setting is limited to the supported revision. Both discs share the same DOL.
+
+The staged runtime ran the Disc 1 startup logos and opening video with Vulkan and Cubeb audio. It measured `1.000` median speed, `59.932` video updates per second and `29.984` rendered FPS across 46 samples. The run exited normally. A separate manual test reached the main menu at about 60 FPS. The tester reported clear audio with the updated window running alone. Disc 2 measured `0.999` median speed over 15 headless boot samples and exited normally. Gameplay pacing, codec audio and the disc transition still need verification.
+
 ```powershell
 python scripts/benchmark_boot.py --data .local/player --runner .local/runtime/moderngekko-run.exe
 ```

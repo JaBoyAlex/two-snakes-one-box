@@ -33,6 +33,7 @@ def main():
     apply_patch(source, 'moderngekko-auto-gamepad.patch')
     apply_patch(source, 'moderngekko-no-empty-mod-hooks.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-auto-gamepad.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-twin-snakes-idle.patch')
     subprocess.run(['cmake', '-S', str(source), '-B', str(build), '-G', 'Ninja',
                     '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_TESTING=OFF',
                     f'-DPython3_EXECUTABLE={os.sys.executable}',

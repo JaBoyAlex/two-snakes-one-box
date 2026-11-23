@@ -1,15 +1,15 @@
 # Compatibility and validation
 
-The Windows prototype reaches the title screen with a native boot module and falls below normal game speed. The local USA revision 0 disc pair has been identified and hashed.
+The Windows prototype reaches the title screen with a native boot module. The USA revision 0 idle fix restored normal speed in the early-boot benchmark. The local disc pair has been identified and hashed.
 
 | Area | Evidence |
 | --- | --- |
-| Public source project | Available on GitHub. Source CI passed on the initial commit. |
+| Public source project | Available on GitHub with source CI. |
 | Recompiler/runtime build | DolRecomp, ModernGekko, the disc conversion tool and Windows launcher built locally. |
 | Disc identity and revision validation | Both discs: GGSEA4, revision 0; main executables have identical SHA-256. Full normalized-disc hashes recorded in supported-builds.json. |
 | Native game module | Local setup extracted both RVZ discs and built one shared native boot module. The main game REL was translated in a separate experiment, with runtime integration outstanding. |
-| Title screen / gameplay | Disc 1 reached the title screen using the native DOL and runtime fallback. Gameplay and disc 2 boot remain unverified. |
-| Audio / cutscenes / codec | Audio output started. The first play test reported stutter during the slowdown. Audio timing at normal speed remains unverified. |
+| Boot / gameplay | Disc 1 reached the main menu at about 60 FPS with the idle fix. Disc 2 advanced at normal speed in a headless boot test. Gameplay and the disc transition still need verification. |
+| Audio / cutscenes / codec | Cubeb audio was active while the Vulkan run held normal game speed. The tester reported clear audio in the updated build. Codec conversations and gameplay audio still need verification. |
 | Controller | Rebuilt runtime detected an XInput controller and assigned it to port 1 without a config file. In-game response and reconnection still need verification. |
 | Save / load / disc transition | Not tested |
 | Complete playthrough | Not tested |
