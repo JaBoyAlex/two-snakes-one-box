@@ -24,7 +24,11 @@ A separate instrumented replay estimated more wall time inside the hybrid fallba
 
 During gameplay with one game window running, 26 live samples ranged from `15.8` to `27.1` FPS. The same runtime thread averaged `99%` of one logical core. Replaying a gameplay save with video and audio output disabled measured `1.000` median speed for the JIT and `0.278` for the hybrid build over 41 samples per mode. The hybrid minimum was `0.171`. This slowdown also affects interactive gameplay and is consistent with the tester's report of slow motion and choppy audio.
 
-Two private x64 experiments bypassed the native-dispatch check for guest addresses above the fixed native code range, then also allowed fallback block linking to those addresses. On the same gameplay state, they measured `0.295` and `0.300` median speed, respectively. Both trials remained far below normal speed. The development package uses the original runtime for this path.
+Two private x64 experiments bypassed the native-dispatch check for guest addresses above the fixed native code range, then also allowed fallback block linking to those addresses. On the same gameplay state, they measured `0.295` and `0.300` median speed, respectively. Both trials remained far below normal speed and were dropped.
+
+The x64 runtime now allows the fallback JIT to use Dolphin's fast memory mappings. The active CPU core selects the fallback's RAM mapping and forwards memory faults to the existing JIT backpatcher. The hybrid runtime continues to use the game's original timing. In headless replays with video and audio output disabled, the revised build measured `0.647` and `0.671` median speed at two gameplay checkpoints, and `1.004` at the later cutscene checkpoint. The later cutscene stayed within `0.992–1.021` across 33 samples. Repeating the first gameplay checkpoint in the same test session gave `0.332` for the old hybrid runtime, `0.658` with the fix and `1.000` for the JIT reference over 41 samples each. A cold boot on the revised runtime measured `1.000` over 29 samples. Live Vulkan frame pacing and audio at these checkpoints still need verification.
+
+On the first gameplay checkpoint, recompiling the native C module with `-O3 -march=x86-64-v3` moved the median from `0.647` to `0.657` with the fixed runtime. The minimum fell from `0.585` to `0.548`, so the development build keeps its existing compiler settings. A separate experiment to reuse an active CPU timing slice also slowed the gameplay replay when combined with fast memory. The engine REL still runs through the fallback JIT and is the next candidate for native execution.
 
 ```powershell
 python scripts/benchmark_boot.py --data .local/player --runner .local/runtime/moderngekko-run.exe
@@ -32,13 +36,22 @@ python scripts/benchmark_boot.py --data .local/player --runner .local/runtime/mo
 
 Use an idle machine and the same disc, graphics backend and scene for comparisons. The default headless run isolates the CPU path. `--windowed` adds normal Vulkan presentation and audio output. The pinned runtime raised an ImGui context assertion during an experimental offscreen Vulkan run, so that configuration yielded no hybrid result. For gameplay, measure frame pacing and compare input response, audio timing and cutscene timing with the retail disc under Dolphin. Generated outputs, logs and capture files stay local.
 
-Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay.
+Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay. Benchmark profiles and logs default to a subdirectory of the system temporary directory. Use `--output PATH` to retain traces elsewhere. One run in a synced workspace failed to replace the test profile's filesystem metadata (`IOS_FS: Failed to rename temporary FST file`). Repeat runs with isolated profiles outside the synced workspace completed successfully.
 
 ## Tool comparisons
 
+I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
+
+| GameCube recomp | Downloads in the sample | Performance changes |
+| --- | ---: | --- |
+| [Luigi's Mansion Recompiled](https://github.com/rob646464/luigis-mansion-recompiled/releases) | 26,308 | Fixed redundant rendering work in the original 30 FPS mode, which had slowed cutscenes and desynchronized sound. Later releases reduced shader preparation work and freed unused textures, render targets, and shader memory. |
+| [Skies of Arcadia Legends Recompiled](https://github.com/ogdanimal/SkiesOfArcadiaLegends-Recomp/releases/tag/v0.91.0-beta) | 12,092 | Replaced the earlier Dolphin-derived runtime with a standalone GameCube hardware layer. Its developers measured 1.46× original speed versus 0.88× on one low-power PC core. The project also prepares shaders ahead of play and documents LLVM profile-guided builds in its [build guide](https://github.com/ogdanimal/SkiesOfArcadiaLegends-Recomp/blob/main/BUILDING.md). |
+| [Eternal Darkness Recomp](https://github.com/griches/EternalDarknessRecomp) | 8,817 | Runs native code through GXRuntime with host SDK services and native graphics backends. Its high-refresh presentation adds intermediate frames independently of the original game cadence. |
+
+Our save-state slowdown reproduces with graphics and audio output disabled. The Skies runtime comparison is the closest match for current CPU and hardware-layer work. Once gameplay holds its original clock, the Luigi's Mansion work gives us specific tests for redundant per-frame work and shader preparation.
+
 | Project | What to test or reuse |
 | --- | --- |
-| [Skies of Arcadia Legends Recompiled](https://github.com/ogdanimal/SkiesOfArcadiaLegends-Recomp/blob/main/BUILDING.md) | DolRecomp's LLVM path, per-target CPU selection and profile-guided optimization. Establish a correct Windows x64 baseline before using profiles from representative gameplay. |
 | [Medal of Honor Frontline GameCube Recomp](https://github.com/ant0-blase/MOHFrontline-GC-RECOMP) | The runtime verifies loaded guest bytes before choosing native code for multiple executable images. Twin Snakes needs a related check for its relocatable module, whose addresses may differ by session. |
 | [GekkoAOT](https://github.com/ant0-blase/GekkoAOT) | An alternate runtime with direct RVZ input and REL discovery. Its v0.0.9 Windows tool found `main.dol` and `mgso.rel` on the USA Disc 1 RVZ and entered REL compilation. Gameplay compatibility is still unverified. |
 | [Twin Snakes Native Port](https://github.com/alphanu1/msg-twinsnakes-recomp) and its [Switch prototype](https://github.com/ramonDias07/MGSTTS-nx) | Public PAL analysis and runtime behavior are starting points for comparisons. Validate every code layout and timing assumption independently on the USA revision. |

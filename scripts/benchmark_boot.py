@@ -5,10 +5,8 @@ import os
 from pathlib import Path
 import statistics
 import subprocess
+import tempfile
 import time
-
-
-ROOT = Path(__file__).resolve().parents[1]
 
 
 def benchmark(mode, runner, game, module, work, windowed, seconds, load_state, dispatch_samples):
@@ -100,7 +98,8 @@ def main():
     parser.add_argument('--module', type=Path, help='Test a candidate module instead of the prepared module')
     parser.add_argument('--load-state', type=Path, help='Replay a local Disc 1 save state for a scene comparison')
     parser.add_argument('--dispatch-samples', action='store_true', help='Log the busiest native dispatch sites on shutdown')
-    parser.add_argument('--output', type=Path, default=ROOT / '.local/benchmarks')
+    parser.add_argument('--output', type=Path,
+                        help='Directory for isolated profiles and logs (default: system temporary directory)')
     parser.add_argument('--seconds', type=int, default=20)
     parser.add_argument('--mode', choices=['aot', 'jit', 'both'], default='both')
     parser.add_argument('--windowed', action='store_true', help='Use Vulkan and normal audio instead of headless Null output')
@@ -112,7 +111,8 @@ def main():
     disc = prepared['discs'][0]
     module = args.module.resolve(strict=True) if args.module else data / disc['module']
     load_state = args.load_state.resolve(strict=True) if args.load_state else None
-    work = args.output.resolve() / str(time.time_ns())
+    work = (args.output.resolve() / str(time.time_ns()) if args.output else
+            Path(tempfile.mkdtemp(prefix='TwinSnakesRecompBenchmark-')))
     modes = ['jit', 'aot'] if args.mode == 'both' else [args.mode]
     outcomes = [benchmark(mode, args.runner.resolve(strict=True), data / disc['root'],
                           module, work / mode, args.windowed, args.seconds, load_state, args.dispatch_samples)

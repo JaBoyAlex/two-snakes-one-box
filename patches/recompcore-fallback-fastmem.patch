@@ -1,0 +1,69 @@
+diff --git a/Source/Core/Core/PowerPC/JitCommon/JitBase.cpp b/Source/Core/Core/PowerPC/JitCommon/JitBase.cpp
+index 2236654570..7c71cfd7b6 100644
+--- a/Source/Core/Core/PowerPC/JitCommon/JitBase.cpp
++++ b/Source/Core/Core/PowerPC/JitCommon/JitBase.cpp
+@@ -146,7 +146,13 @@ void JitBase::RefreshConfig()
+   jo.fp_exceptions = m_enable_float_exceptions;
+   jo.div_by_zero_exceptions = m_enable_div_by_zero_exceptions;
+ 
+-  if (Config::Get(Config::MAIN_CPU_CORE) == PowerPC::CPUCore::StaticRecomp)
++  // The x64 static core forwards JIT memory faults and arena selection to its fallback.
++#ifdef _M_X86_64
++  const bool jit_owns_fastmem = IsStaticRecompFallback();
++#else
++  constexpr bool jit_owns_fastmem = false;
++#endif
++  if (Config::Get(Config::MAIN_CPU_CORE) == PowerPC::CPUCore::StaticRecomp && !jit_owns_fastmem)
+   {
+     m_fastmem_enabled = false;
+     m_page_table_fastmem_enabled = false;
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
+index e3581cc938..24380413d1 100644
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
+@@ -194,10 +194,28 @@ void StaticRecompCore::Init()
+   {
+     m_fallback_jit->SetStaticRecompFallback(true);
+     m_fallback_jit->Init();
++#ifdef _M_X86_64
++    // JitInterface uses the active core's arena flag to set the fallback's RAM base.
++    jo.fastmem_arena = m_fallback_jit->jo.fastmem_arena;
++#else
+     m_fallback_jit->SetStaticRecompFallback(true);
++#endif
+   }
+ }
+ 
++#ifdef _M_X86_64
++bool StaticRecompCore::HandleFault(uintptr_t access_address, SContext* ctx)
++{
++  return m_fallback_jit && m_fallback_jit->jo.fastmem &&
++         m_fallback_jit->HandleFault(access_address, ctx);
++}
++
++bool StaticRecompCore::WantsPageTableMappings() const
++{
++  return m_fallback_jit && m_fallback_jit->WantsPageTableMappings();
++}
++#endif
++
+ void StaticRecompCore::Shutdown()
+ {
+   g_static_recomp_core = nullptr;
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
+index d084fea634..c28cd0f7d0 100644
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
+@@ -58,7 +58,12 @@ public:
+ 
+   void ClearCache() override;
+   void Jit(u32 em_address) override {}
++#ifdef _M_X86_64
++  bool HandleFault(uintptr_t access_address, SContext* ctx) override;
++  bool WantsPageTableMappings() const override;
++#else
+   bool HandleFault(uintptr_t access_address, SContext* ctx) override { return false; }
++#endif
+ 
+   JitBaseBlockCache* GetBlockCache() override { return &m_block_cache; }
+ 
