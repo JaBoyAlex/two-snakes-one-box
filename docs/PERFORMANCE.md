@@ -48,6 +48,8 @@ Use a regular windowed launch for physical controller checks. `--automation-dir`
 
 The tester subsequently reported gameplay drops. Thirteen nearby live samples ranged from 35.0 to 47.0 rendered FPS while the busiest runtime thread averaged 99.6% of one logical CPU. Six concurrent samples put 3D GPU engine usage between 7.8% and 8.2%. A local save state from that part of gameplay is available for comparing the CPU paths with the same starting state.
 
+A private x64 trial linked fallback JIT blocks directly when the destination could not belong to the fixed native module. The dispatcher still checks destinations inside native code ranges. In the first matched headless replay of the new checkpoint, the reference measured `0.837` median speed and `0.780` minimum speed. The trial measured `1.000` median and `0.999` minimum. Both runs completed 21 samples, recorded native dispatches, and shut down normally. Repeat runs and windowed gameplay are pending.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
