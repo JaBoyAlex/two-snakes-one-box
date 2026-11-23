@@ -2,7 +2,7 @@
 
 A work-in-progress native recompilation project for **Metal Gear Solid: The Twin Snakes** on GameCube, with local-disc setup and RecompLauncher integration.
 
-**Development status.** The Windows prototype reaches the title screen. A revision-specific idle fix restores normal speed in the boot benchmark. Gameplay testing is ongoing.
+**Development status.** The Windows prototype reaches gameplay. A revision-specific idle fix restores normal speed during boot. Later cutscenes and gameplay still slow down.
 
 Players will provide both **USA revision 0** discs matching `supported-builds.json`. Commercial game data and generated game code are never included in this repository or release downloads.
 

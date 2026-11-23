@@ -22,6 +22,10 @@ A replay starting from a later save state in the same cutscene measured `1.000` 
 
 A separate instrumented replay estimated more wall time inside the hybrid fallback JIT than in native dispatch and register-state synchronization combined. The instrumented run was slower, so use the plain replay for speed comparisons. The next CPU investigation is the cost of moving between the native module and the fallback JIT during this scene.
 
+During gameplay with one game window running, 26 live samples ranged from `15.8` to `27.1` FPS. The same runtime thread averaged `99%` of one logical core. Replaying a gameplay save with video and audio output disabled measured `1.000` median speed for the JIT and `0.278` for the hybrid build over 41 samples per mode. The hybrid minimum was `0.171`. This slowdown also affects interactive gameplay and is consistent with the tester's report of slow motion and choppy audio.
+
+Two private x64 experiments bypassed the native-dispatch check for guest addresses above the fixed native code range, then also allowed fallback block linking to those addresses. On the same gameplay state, they measured `0.295` and `0.300` median speed, respectively. Both trials remained far below normal speed. The development package uses the original runtime for this path.
+
 ```powershell
 python scripts/benchmark_boot.py --data .local/player --runner .local/runtime/moderngekko-run.exe
 ```
