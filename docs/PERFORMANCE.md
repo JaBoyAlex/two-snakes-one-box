@@ -18,6 +18,8 @@ A live Windows capture during the indoor dialogue after the submarine shot measu
 
 A headless replay of a local save state from the later cutscene measured `1.000` median speed with the JIT and `0.728` with hybrid native execution over 57 samples per mode. The worst hybrid sample was `0.668`, while the JIT stayed between `1.000` and `1.002`. The scene reproduced the slowdown with no graphics or audio output. A native dispatch profile found repeated data-cache flush and invalidation loops among the busiest sites. Routing those loops to the fallback JIT reduced instruction-level fallbacks from 6.57 million to 0.17 million, with essentially the same median speed of `0.730`.
 
+A replay starting from a later save state in the same cutscene measured `1.000` with the JIT and `0.652` with hybrid execution over 33 samples per mode. The hybrid minimum was `0.552`. Both runs exited normally.
+
 A separate instrumented replay estimated more wall time inside the hybrid fallback JIT than in native dispatch and register-state synchronization combined. The instrumented run was slower, so use the plain replay for speed comparisons. The next CPU investigation is the cost of moving between the native module and the fallback JIT during this scene.
 
 ```powershell
