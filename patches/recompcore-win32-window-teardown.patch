@@ -1,0 +1,59 @@
+diff --git a/Source/Core/DolphinNoGUI/PlatformWin32.cpp b/Source/Core/DolphinNoGUI/PlatformWin32.cpp
+--- a/Source/Core/DolphinNoGUI/PlatformWin32.cpp
++++ b/Source/Core/DolphinNoGUI/PlatformWin32.cpp
+@@ -91,7 +91,12 @@
+ PlatformWin32::~PlatformWin32()
+ {
+   if (m_hwnd)
++  {
++    // DestroyWindow can deliver focus messages after the runtime has shut
++    // down its configuration. Stop dispatching to the platform first.
++    SetWindowLongPtr(m_hwnd, GWLP_USERDATA, 0);
+     DestroyWindow(m_hwnd);
++  }
+ }
+ 
+ bool PlatformWin32::RegisterRenderWindowClass()
+@@ -340,16 +345,20 @@
+ LRESULT PlatformWin32::WndProc(const HWND hwnd, const UINT msg, const WPARAM wParam,
+                                const LPARAM lParam)
+ {
+-  PlatformWin32* platform = reinterpret_cast<PlatformWin32*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+-  switch (msg)
+-  {
+-  case WM_NCCREATE:
+-  {
+-    platform = static_cast<PlatformWin32*>(reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams);
++  if (msg == WM_NCCREATE)
++  {
++    const auto* create = reinterpret_cast<const CREATESTRUCT*>(lParam);
++    auto* platform = static_cast<PlatformWin32*>(create->lpCreateParams);
+     SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(platform));
+     return DefWindowProc(hwnd, msg, wParam, lParam);
+   }
+ 
++  auto* platform = reinterpret_cast<PlatformWin32*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
++  if (!platform)
++    return DefWindowProc(hwnd, msg, wParam, lParam);
++
++  switch (msg)
++  {
+   case WM_CREATE:
+   {
+     if (hwnd)
+@@ -421,14 +430,11 @@
+     return DefWindowProc(hwnd, msg, wParam, lParam);
+ 
+   case WM_INITMENUPOPUP:
+-    if (platform)
+-      platform->RefreshMenu(reinterpret_cast<HMENU>(wParam));
++    platform->RefreshMenu(reinterpret_cast<HMENU>(wParam));
+     break;
+ 
+   case WM_COMMAND:
+   {
+-    if (!platform)
+-      break;
+     const UINT command = LOWORD(wParam);
+     auto& system = Core::System::GetInstance();
+     if (command == ID_SAVE_STATE)

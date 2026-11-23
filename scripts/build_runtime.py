@@ -36,8 +36,10 @@ def main():
     apply_patch(source, 'moderngekko-auto-gamepad.patch')
     apply_patch(source, 'moderngekko-no-empty-mod-hooks.patch')
     apply_patch(source, 'moderngekko-disc-pair.patch')
+    apply_patch(source, 'moderngekko-title-game-speed.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch',
                 after=('recompcore-auto-gamepad.patch',))
+    apply_patch(source / 'vendor/dolphin', 'recompcore-win32-window-teardown.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-fastmem.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-verified-virtual-code.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-headless-shader-progress.patch')

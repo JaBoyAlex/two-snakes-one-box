@@ -1,0 +1,32 @@
+diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
+--- a/src/runtime/dolphin_runtime.cpp
++++ b/src/runtime/dolphin_runtime.cpp
+@@ -63,11 +63,13 @@
+ double s_net_wait_ms_per_second = 0.0;
+ std::chrono::steady_clock::time_point s_previous_net_wait_sample;
+ 
+-std::string FormatWindowTitle(const std::string &title, double fps) {
++std::string FormatWindowTitle(const std::string &title, double fps, double speed) {
+   if (!std::isfinite(fps) || fps < 0.0)
+     fps = 0.0;
+   const auto now = std::chrono::steady_clock::now();
+   std::string formatted_title = fmt::format("{} | {:.1f} FPS", title, fps);
++  if (std::isfinite(speed) && speed > 0.0)
++    formatted_title += fmt::format(" | {:.0f}% speed", speed * 100.0);
+   const NetPlay::InputWaitTelemetry telemetry =
+       NetPlay::NetPlayClient::GetInputWaitTelemetry();
+   if (!telemetry.active) {
+@@ -127,9 +129,10 @@
+ 
+   std::string title = s_window_title;
+   if (s_show_fps_in_title &&
+-      s_platform->GetWindowSystemInfo().type != WindowSystemType::Headless)
+-    title = FormatWindowTitle(
+-        title, Core::System::GetInstance().GetPerfMetrics().GetFPS());
++      s_platform->GetWindowSystemInfo().type != WindowSystemType::Headless) {
++    const auto& perf = Core::System::GetInstance().GetPerfMetrics();
++    title = FormatWindowTitle(title, perf.GetFPS(), perf.GetSpeed());
++  }
+   s_platform->SetTitle(title);
+ }
+ void Host_UpdateDisasmDialog() {}

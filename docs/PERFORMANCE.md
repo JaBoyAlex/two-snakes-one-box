@@ -1,6 +1,6 @@
 # Performance and runtime evaluation
 
-The first Windows run reached the title screen on an Intel Core i5-11400 and RTX 3060 Ti. The user reported about 17–18 FPS and drops to 5 FPS with audible stutter. The screen counter measures rendered frames. Runtime speed measures advancement of the GameCube clock, with `1.0` representing normal speed.
+The first Windows run reached the title screen on an Intel Core i5-11400 and RTX 3060 Ti. The user reported about 17–18 FPS and drops to 5 FPS with audible stutter. The window title can display rendered FPS and game speed separately. `100% speed` means the GameCube clock is advancing normally.
 
 The hybrid build uses a native C module for `main.dol` and falls back for other guest code. The loader plus game module account for about 97,000 and 1,135,000 PowerPC instructions, respectively, before reachability analysis. The engine module, `mgso.rel`, needs a runtime relocation mapping so compiled code executes at the addresses the game actually loaded. Translation alone establishes neither coverage nor correct runtime behavior.
 
@@ -43,6 +43,10 @@ Use an idle machine and the same disc, graphics backend and scene for comparison
 Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay. Benchmark profiles and logs default to a subdirectory of the system temporary directory. Use `--output PATH` to retain traces elsewhere. One run in a synced workspace failed to replace the test profile's filesystem metadata (`IOS_FS: Failed to rename temporary FST file`). Repeat runs with isolated profiles outside the synced workspace completed successfully.
 
 Use `--compare-module PATH` to compare a native module against the prepared module on the same runner. Add `--module PATH` to supply a different reference. The benchmark runs reference, candidate, candidate, reference in separate profiles to expose run-order effects. A run that exits before the requested sampling window ends is marked incomplete even if it exits normally.
+
+Use a regular windowed launch for physical controller checks. `--automation-dir` installs scripted input overrides, including when it is added only to capture timing. During a manual test the launcher detected the XInput pad and assigned it to port 1 after resuming the saved session without those overrides. The tester confirmed that the controller responded, reported around 30 FPS in the replayed cutscene, and saw around 50 FPS in the first 15 seconds of gameplay. The game clock was unavailable in the window title on that build.
+
+The tester subsequently reported gameplay drops. Thirteen nearby live samples ranged from 35.0 to 47.0 rendered FPS while the busiest runtime thread averaged 99.6% of one logical CPU. Six concurrent samples put 3D GPU engine usage between 7.8% and 8.2%. A local save state from that part of gameplay is available for comparing the CPU paths with the same starting state.
 
 ## Tool comparisons
 
