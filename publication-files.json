@@ -12,6 +12,7 @@
   "recomplauncher.json",
   ".github/workflows/checks.yml",
   "app/discs.py",
+  "app/rel_image.py",
   "app/twin_snakes.py",
   "src/launcher.cpp",
   "scripts/bootstrap.py",
@@ -26,9 +27,11 @@
   "patches/recompcore-fallback-fastmem.patch",
   "patches/recompcore-gamepad-bindings.patch",
   "patches/recompcore-twin-snakes-idle.patch",
+  "patches/recompcore-verified-virtual-code.patch",
   "docs/BUILDING.md",
   "docs/ROADMAP.md",
   "docs/STATUS.md",
   "docs/PERFORMANCE.md",
-  "tests/test_discs.py"
+  "tests/test_discs.py",
+  "tests/test_rel_image.py"
 ]

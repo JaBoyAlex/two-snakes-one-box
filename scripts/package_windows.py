@@ -40,7 +40,8 @@ def main():
         raise SystemExit('Use a new package version or remove the old staging directory after reviewing it.')
     stage.mkdir(parents=True)
     for name in ['README.md', 'LICENSE', 'THIRD_PARTY.md', 'recomplauncher.json',
-                 'dependencies.lock.json', 'supported-builds.json', 'app/discs.py', 'app/twin_snakes.py']:
+                 'dependencies.lock.json', 'supported-builds.json', 'app/discs.py',
+                 'app/rel_image.py', 'app/twin_snakes.py']:
         destination = stage / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / name, destination)

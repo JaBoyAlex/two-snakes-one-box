@@ -1,0 +1,202 @@
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
+index 24380413d1..f648dcab4f 100644
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
+@@ -349,6 +349,7 @@ void StaticRecompCore::LoadModule()
+   m_failed_chunks = 0;
+   m_lookup_ram_size = 0;
+   m_lookup_exram_size = 0;
++  m_lookup_fake_vmem_size = 0;
+   m_chunk_lookup_table.clear();
+ 
+   if (m_module_source.host_call_range_contains)
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
+index c28cd0f7d0..09e1476c7b 100644
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
+@@ -130,6 +130,7 @@ private:
+   int ChunkIndexOf(u32 address);
+   bool IsForcedFallbackAddress(u32 address) const;
+   bool ChunkContainsHostCall(u32 index) const;
++  const u8* GetCodeBytes(u32 address, u32 length) const;
+   void VerifyChunk(u32 index);
+   bool ResolveNativeAddress(u32 runtime_address, u32* linked_address, u32* rel_section_index);
+   bool ResolveRuntimeAddress(u32 linked_address, u32* runtime_address) const;
+@@ -204,10 +205,22 @@ private:
+   u64 m_reverify_events = 0;  // invalidations that reset a chunk to Unverified
+ 
+   // Lookup table optimization for O(1) chunk searches
++  static constexpr u32 FAKE_VMEM_BASE = 0x7E000000u;
+   std::vector<int> m_chunk_lookup_table;
+   u32 m_lookup_ram_size = 0;
+   u32 m_lookup_exram_size = 0;
+-  int GetAddressLookupIndex(u32 address) const;
++  u32 m_lookup_fake_vmem_size = 0;
++  int GetAddressLookupIndex(u32 address) const
++  {
++    if (address - 0x80000000u < m_lookup_ram_size)
++      return static_cast<int>((address - 0x80000000u) >> 2);
++    if (address - 0x90000000u < m_lookup_exram_size)
++      return static_cast<int>((m_lookup_ram_size + (address - 0x90000000u)) >> 2);
++    if (address - FAKE_VMEM_BASE < m_lookup_fake_vmem_size)
++      return static_cast<int>((m_lookup_ram_size + m_lookup_exram_size +
++                               (address - FAKE_VMEM_BASE)) >> 2);
++    return -1;
++  }
+   void InitLookupTable(u32 ram_size, u32 exram_size);
+ 
+   // Dispatch locality: most control transfers stay inside one chunk, so the
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Run.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Run.cpp
+index d91ec2dc19..e64467edb9 100644
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Run.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Run.cpp
+@@ -70,15 +70,7 @@ void StaticRecompCore::Run()
+     if (!m_module_active || m_chunk_lookup_table.empty())
+       return false;
+ 
+-    int lookup_index = -1;
+-    if (address >= 0x80000000u && address < 0x80000000u + m_lookup_ram_size)
+-    {
+-      lookup_index = static_cast<int>((address - 0x80000000u) >> 2);
+-    }
+-    else if (address >= 0x90000000u && address < 0x90000000u + m_lookup_exram_size)
+-    {
+-      lookup_index = static_cast<int>((m_lookup_ram_size >> 2) + ((address - 0x90000000u) >> 2));
+-    }
++    const int lookup_index = GetAddressLookupIndex(address);
+     if (lookup_index < 0 || lookup_index >= static_cast<int>(m_chunk_lookup_table.size()))
+       return false;
+     const int chunk = m_chunk_lookup_table[lookup_index];
+@@ -90,18 +82,7 @@ void StaticRecompCore::Run()
+     if (pc < 4u || (pc & 3u) != 0)
+       return false;
+ 
+-    const u32 instruction_pc = pc - 4u;
+-    const u8* code = nullptr;
+-    if (instruction_pc >= 0x80000000u &&
+-        instruction_pc - 0x80000000u + 4u <= m_guest.ram_size)
+-    {
+-      code = m_guest.ram + instruction_pc - 0x80000000u;
+-    }
+-    else if (instruction_pc >= 0x90000000u &&
+-             instruction_pc - 0x90000000u + 4u <= m_guest.exram_size)
+-    {
+-      code = m_guest.exram + instruction_pc - 0x90000000u;
+-    }
++    const u8* code = GetCodeBytes(pc - 4u, 4u);
+     if (!code)
+       return false;
+ 
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp
+index 491c57ef3a..8c2ed7cb29 100644
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp
+@@ -158,22 +158,26 @@ u32 StaticRecompCore::TranslateRelAddress(u32 linked_address)
+   return runtime_address;
+ }
+ 
+-int StaticRecompCore::GetAddressLookupIndex(u32 address) const
+-{
+-  if (address >= 0x80000000u && address < 0x80000000u + m_lookup_ram_size)
+-    return static_cast<int>((address - 0x80000000u) >> 2);
+-  if (address >= 0x90000000u && address < 0x90000000u + m_lookup_exram_size)
+-    return static_cast<int>((m_lookup_ram_size >> 2) + ((address - 0x90000000u) >> 2));
+-  return -1;
+-}
+-
+ void StaticRecompCore::InitLookupTable(u32 ram_size, u32 exram_size)
+ {
+-  if (m_lookup_ram_size == ram_size && m_lookup_exram_size == exram_size)
++  auto& memory = m_system.GetMemory();
++  u32 fake_vmem_size = 0;
++  if (m_module && memory.GetFakeVMEM())
++  {
++    const auto* ranges = m_module->code_ranges;
++    if (std::any_of(ranges, ranges + m_module->num_code_ranges, [&memory](const auto& range) {
++          return range.start >= FAKE_VMEM_BASE &&
++                 range.end - FAKE_VMEM_BASE <= memory.GetFakeVMemSize();
++        }))
++      fake_vmem_size = memory.GetFakeVMemSize();
++  }
++  if (m_lookup_ram_size == ram_size && m_lookup_exram_size == exram_size &&
++      m_lookup_fake_vmem_size == fake_vmem_size)
+     return;
+ 
+   m_lookup_ram_size = ram_size;
+   m_lookup_exram_size = exram_size;
++  m_lookup_fake_vmem_size = fake_vmem_size;
+ 
+   if (!m_module)
+   {
+@@ -181,21 +185,18 @@ void StaticRecompCore::InitLookupTable(u32 ram_size, u32 exram_size)
+     return;
+   }
+ 
+-  u32 total_instructions = (ram_size + exram_size) >> 2;
++  const u32 total_instructions = (ram_size + exram_size + fake_vmem_size) >> 2;
+   m_chunk_lookup_table.assign(total_instructions, -1);
+ 
+   for (u32 i = 0; i < m_module->num_chunk_ranges; ++i)
+   {
+     const auto& chunk = m_module->chunk_ranges[i];
+-    int start_idx = GetAddressLookupIndex(chunk.start);
+-    int end_idx = GetAddressLookupIndex(chunk.end);
+-
+-    if (start_idx >= 0 && end_idx >= start_idx)
++    const int start_idx = GetAddressLookupIndex(chunk.start);
++    const int last_idx = GetAddressLookupIndex(chunk.end - 4u);
++    const int length = static_cast<int>((chunk.end - chunk.start) >> 2);
++    if (start_idx >= 0 && last_idx >= 0 && last_idx - start_idx + 1 == length)
+     {
+-      for (int idx = start_idx; idx < end_idx; ++idx)
+-      {
+-        m_chunk_lookup_table[idx] = static_cast<int>(i);
+-      }
++      std::fill_n(m_chunk_lookup_table.begin() + start_idx, length, static_cast<int>(i));
+     }
+   }
+ }
+@@ -279,18 +280,31 @@ bool StaticRecompCore::ChunkContainsHostCall(u32 index) const
+   return found;
+ }
+ 
++const u8* StaticRecompCore::GetCodeBytes(u32 address, u32 length) const
++{
++  auto& memory = m_system.GetMemory();
++  const auto in_range = [length](u32 offset, u32 region_size) {
++    return offset < region_size && length <= region_size - offset;
++  };
++  if (in_range(address - 0x80000000u, m_lookup_ram_size))
++    return memory.GetRAM() + (address - 0x80000000u);
++  if (in_range(address - 0x90000000u, m_lookup_exram_size))
++    return memory.GetEXRAM() + (address - 0x90000000u);
++  if (in_range(address - FAKE_VMEM_BASE, m_lookup_fake_vmem_size))
++    return memory.GetFakeVMEM() + (address - FAKE_VMEM_BASE);
++  return nullptr;
++}
++
+ void StaticRecompCore::VerifyChunk(u32 index)
+ {
+   const auto& chunk = m_module->chunk_ranges[index];
+-  auto& memory = m_system.GetMemory();
+-  const u32 ram_size = memory.GetRamSizeReal();
+   u32 runtime_start = chunk.start;
+   ResolveRuntimeAddress(chunk.start, &runtime_start);
+-  const u32 offset = runtime_start - 0x80000000u;
+   const u32 length = chunk.end - chunk.start;
++  const u8* bytes = GetCodeBytes(runtime_start, length);
+   ++m_verifications;
+ 
+-  if (runtime_start < 0x80000000u || offset >= ram_size || length > ram_size - offset)
++  if (!bytes)
+   {
+     m_chunk_state[index] = CHUNK_FAILED;
+     ++m_failed_chunks;
+@@ -300,7 +314,6 @@ void StaticRecompCore::VerifyChunk(u32 index)
+   }
+ 
+   // FNV-1a 64, matching gen_module_tables.py.
+-  const u8* bytes = memory.GetRAM() + offset;
+   u64 hash = 0xCBF29CE484222325ull;
+   for (u32 i = 0; i < length; ++i)
+   {

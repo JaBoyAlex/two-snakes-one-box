@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -13,6 +14,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from discs import DiscError, inspect_iso, validate_pair
+from rel_image import link_rel_image
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD_FORMAT = 2
@@ -110,14 +112,21 @@ def installation_lock(data):
                 fcntl.flock(stream, fcntl.LOCK_UN)
 
 
-def run(command, log, *, env=None, code=22):
+def run(command, log, *, env=None, code=22, on_line=None):
     # Always an argument vector. Disc paths never become shell expressions.
     log.write('\n' + json.dumps([str(p) for p in command]) + '\n')
     log.flush()
-    process = subprocess.Popen([str(p) for p in command], stdout=log,
+    process = subprocess.Popen([str(p) for p in command], stdout=subprocess.PIPE if on_line else log,
                                stderr=subprocess.STDOUT, env=env,
                                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
     try:
+        if on_line:
+            with process.stdout:
+                for raw_line in process.stdout:
+                    line = raw_line.decode('utf-8', errors='replace').rstrip('\r\n')
+                    log.write(line + '\n')
+                    log.flush()
+                    on_line(line)
         result = process.wait()
     except BaseException:
         process.terminate()
@@ -163,42 +172,71 @@ def compiler_environment(runtime):
     paths = [p for p in [tools / 'llvm-mingw/bin', tools / 'cmake/bin', tools / 'ninja'] if p.is_dir()]
     env['PATH'] = os.pathsep.join([*(str(p) for p in paths), env.get('PATH', '')])
     env['CMAKE_NINJA_FORCE_RESPONSE_FILE'] = '1'
-    for name in ['cmake', 'ninja']:
-        if not shutil.which(name, path=env['PATH']):
-            raise SetupError(f'{name} is unavailable. This development build still needs native build tools.')
+    env['NINJA_STATUS'] = '[%f/%t] '
+    cmake = shutil.which('cmake', path=env['PATH'])
+    if not cmake or not shutil.which('ninja', path=env['PATH']):
+        raise SetupError('CMake and Ninja are required for local recompilation.')
     compiler = next((shutil.which(name, path=env['PATH']) for name in ['clang', 'gcc', 'cl'] if shutil.which(name, path=env['PATH'])), None)
     if not compiler:
         raise SetupError('A C compiler is required for local recompilation.')
-    return env, compiler
+    return env, cmake, compiler
 
 
-def build_disc(iso, disc, build, runtime, env, compiler, log):
+def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layout=None):
     extracted = build / f'disc{disc.number + 1}'
-    if not (extracted / 'sys/main.dol').is_file():
+    dol = extracted / 'sys/main.dol'
+    if not dol.is_file():
         run([tool(runtime, 'dolrecomp'), 'extract', iso, extracted], log, code=20)
-    if digest(extracted / 'sys/main.dol') != disc.dol_sha256:
+    if digest(dol) != disc.dol_sha256:
         raise DiscError('Extracted executable does not match the selected disc.')
+    if rel_layout:
+        rel = extracted / rel_layout['path']
+        if digest(rel) != rel_layout['sha256']:
+            raise DiscError('Extracted game module does not match the verified revision.')
     module_build = build / 'modules' / disc.dol_sha256[:16]
     suffix = '.dll' if os.name == 'nt' else ('.dylib' if sys.platform == 'darwin' else '.so')
     module = module_build / f'g{disc.game_id}_recomp{suffix}'
-    if module.is_file():
+    module_ready = module_build / 'link.complete'
+    if module.is_file() and (not rel_layout or module_ready.is_file()):
         return extracted, module
     generated_parent = build / 'generated' / disc.dol_sha256[:16]
-    run([tool(runtime, 'dolrecomp'), '--gamecube', extracted / 'sys/main.dol', generated_parent], log, env=env)
+    compiler_input = dol
+    recompiler_options = ['--gamecube']
+    if rel_layout:
+        compiler_input = generated_parent / 'linked.dol'
+        compiler_input.parent.mkdir(parents=True, exist_ok=True)
+        compiler_input.write_bytes(link_rel_image(
+            dol.read_bytes(), rel.read_bytes(),
+            load_address=int(rel_layout['load_address'], 16),
+            bss_address=int(rel_layout['bss_address'], 16)))
+        recompiler_options += ['--cpu', 'gekko']
+        # An interrupted link can leave an output without its completion record.
+        module.unlink(missing_ok=True)
+    run([tool(runtime, 'dolrecomp'), *recompiler_options, compiler_input, generated_parent], log, env=env)
     generated = generated_parent / 'generated'
-    shutil.copy2(extracted / 'sys/main.dol', generated / 'main.dol')
+    shutil.copy2(compiler_input, generated / 'main.dol')
     smc = generated / 'generated_smc.txt'
     if not smc.exists():
         smc.touch()
     sdk = runtime / 'sdk'
-    run(['cmake', '-S', sdk / 'module-template', '-B', module_build, '-G', 'Ninja',
+    run([cmake, '-S', sdk / 'module-template', '-B', module_build, '-G', 'Ninja',
          '-DCMAKE_BUILD_TYPE=Release', f'-DCMAKE_C_COMPILER={compiler}',
          f'-DPython3_EXECUTABLE={sys.executable}', f'-DGAME_ID={disc.game_id}',
          f'-DGENERATED_DIR={generated}', f'-DGXRUNTIME_DIR={sdk / "GXRuntime"}',
          f'-DCHASSIS_ABI_DIR={sdk / "Source/Core/Core/PowerPC/StaticRecomp"}'], log, env=env)
-    run(['cmake', '--build', module_build, '-j', str(min(8, os.cpu_count() or 2))], log, env=env)
+    def report_compilation(line):
+        match = re.match(r'^\[(\d+)/([1-9]\d*)\] (?:Building C object|Linking C shared)', line)
+        if match:
+            finished, total = (int(value) for value in match.groups())
+            progress(0.22 + disc.number * 0.36 + 0.28 * finished / total,
+                     f'Compiling native module ({finished}/{total} steps)')
+
+    run([cmake, '--build', module_build, '-j', str(min(8, os.cpu_count() or 2))], log, env=env,
+        on_line=report_compilation)
     if not module.is_file():
         raise SetupError('The compiler did not produce the expected native module.', 22)
+    if rel_layout:
+        module_ready.touch()
     return extracted, module
 
 
@@ -215,7 +253,7 @@ def prepare(args, runtime, data, log):
     if args.inspect:
         print(json.dumps({'disc1': first.record(), 'disc2': second.record()}, indent=2))
         return
-    env, compiler = compiler_environment(runtime)
+    env, cmake, compiler = compiler_environment(runtime)
     # Hash full content, not only main.dol: two images with different assets
     # must never share a prepared extraction or a completed-build marker.
     disc_hashes = [digest(iso1), digest(iso2)]
@@ -227,11 +265,14 @@ def prepare(args, runtime, data, log):
         raise DiscError('The executable differs from the supported USA revision 0 build.')
     if disc_hashes != [entry['sha256'] for entry in profile['discs']]:
         raise DiscError('A disc differs from the supported reference dump. See supported-builds.json.')
+    rel_layout = profile['rel'] if args.experimental_rel else None
     identity = {'format': BUILD_FORMAT, 'discs': disc_hashes,
                 'runtime': digest(runtime / 'dependencies.lock.json'),
                 'recompiler': digest(tool(runtime, 'dolrecomp')),
                 'runner': digest(tool(runtime, 'moderngekko-run')),
                 'host': platform.machine(), 'compiler': compiler}
+    if rel_layout:
+        identity['rel'] = rel_layout
     key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:32]
     build = cache / 'builds' / key
     completed = build / 'prepared.json'
@@ -244,7 +285,8 @@ def prepare(args, runtime, data, log):
     results = []
     for index, (iso, disc) in enumerate([(iso1, first), (iso2, second)]):
         progress(0.18 + index * 0.36, f'Extracting and compiling Disc {index + 1}')
-        extracted, module = build_disc(iso, disc, build, runtime, env, compiler, log)
+        extracted, module = build_disc(iso, disc, build, runtime, env, cmake, compiler, log,
+                                       rel_layout=rel_layout)
         results.append({'root': extracted.relative_to(data).as_posix(),
                         'dol': (extracted / 'sys/main.dol').relative_to(data).as_posix(),
                         'module': module.relative_to(data).as_posix(),
@@ -284,6 +326,8 @@ def play(args, runtime, data, log):
 def main():
     parser = argparse.ArgumentParser(description='Twin Snakes Recomp development setup and player')
     parser.add_argument('--prepare', action='store_true')
+    parser.add_argument('--experimental-rel', action='store_true',
+                        help='Compile the gameplay module along with the boot executable')
     parser.add_argument('--inspect', action='store_true')
     parser.add_argument('--disc1', type=Path)
     parser.add_argument('--disc2', type=Path)
@@ -295,6 +339,8 @@ def main():
     parser.add_argument('--automation-dir', type=Path)
     parser.add_argument('--gui', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.experimental_rel and not args.prepare:
+        parser.error('--experimental-rel requires --prepare')
     data = (args.data or default_data()).resolve()
     runtime = (args.runtime or (ROOT / 'runtime' if (ROOT / 'runtime').is_dir() else ROOT / '.local/runtime')).resolve()
     try:
