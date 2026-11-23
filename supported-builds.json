@@ -1,0 +1,15 @@
+{
+  "format": 1,
+  "builds": [
+    {
+      "name": "USA revision 0 — local reference pair",
+      "game_id": "GGSEA4",
+      "revision": 0,
+      "dol_sha256": "f81cbf0d6629af1fbc06ebd6fa5c0a30737a14472eb58a3ccf5b4bb895b4c5c2",
+      "discs": [
+        {"number": 0, "size": 1459978240, "sha256": "7e19b0dd45f40936ac9aec2d592f9569907b7505d983685ca872e7d70d92975f", "crc32": "02ab12f2"},
+        {"number": 1, "size": 1459978240, "sha256": "8feebfd65f9a7b0d55c48e55d8acbada3b368c7948dd8786a0ea2c9b95de1c20", "crc32": "ff7bcd0a"}
+      ]
+    }
+  ]
+}

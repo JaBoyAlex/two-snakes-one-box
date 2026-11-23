@@ -1,0 +1,223 @@
+{
+  "$schema": "https://recomplauncher.com/schema/recomplauncher.json",
+  "format": 1,
+  "name": "Twin Snakes Recomp (Development)",
+  "repo": "JaBoyAlex/twin-snakes-recomp",
+  "inputs": [
+    {
+      "id": "disc1",
+      "label": "Twin Snakes USA revision 0 \u2014 Disc 1",
+      "role": "disc",
+      "formats": [
+        {
+          "type": "file",
+          "extensions": [
+            "iso",
+            "gcm",
+            "rvz",
+            "gcz"
+          ]
+        }
+      ],
+      "check": {
+        "ids": [
+          "GGSEA4"
+        ]
+      },
+      "dumps": [
+        {
+          "name": "USA revision 0 Disc 1 (normalized ISO, project reference)",
+          "size": 1459978240,
+          "crc32": "02ab12f2"
+        }
+      ]
+    },
+    {
+      "id": "disc2",
+      "label": "Twin Snakes USA revision 0 \u2014 Disc 2",
+      "role": "disc",
+      "formats": [
+        {
+          "type": "file",
+          "extensions": [
+            "iso",
+            "gcm",
+            "rvz",
+            "gcz"
+          ]
+        }
+      ],
+      "check": {
+        "ids": [
+          "GGSEA4"
+        ]
+      },
+      "dumps": [
+        {
+          "name": "USA revision 0 Disc 2 (normalized ISO, project reference)",
+          "size": 1459978240,
+          "crc32": "ff7bcd0a"
+        }
+      ]
+    }
+  ],
+  "prepare": {
+    "program": [
+      "TwinSnakes.exe"
+    ],
+    "args": [
+      "--prepare",
+      "--disc1={input:disc1}",
+      "--disc2={input:disc2}",
+      "--data",
+      "{data}"
+    ],
+    "label": "Validating both discs and building Twin Snakes locally",
+    "done": [
+      "{data}/prepared.json"
+    ]
+  },
+  "start": {
+    "program": [
+      "TwinSnakes.exe"
+    ],
+    "args": [
+      "--data",
+      "{data}"
+    ]
+  },
+  "config": [
+    {
+      "id": "main",
+      "format": "ini",
+      "file": [
+        {
+          "path": "{data}/user/config.ini"
+        }
+      ],
+      "new": {
+        "resolution": "640x528",
+        "backend": "Vulkan",
+        "show_fps_in_title": "true",
+        "fullscreen": "false"
+      }
+    }
+  ],
+  "settings": [
+    {
+      "id": "display",
+      "label": "Display",
+      "group": "Video",
+      "help": "Fullscreen uses the desktop display mode and keeps the original aspect ratio.",
+      "defaults": {
+        "fullscreen": "false"
+      },
+      "choices": [
+        {
+          "label": "Window",
+          "set": {
+            "fullscreen": "false"
+          }
+        },
+        {
+          "label": "Fullscreen",
+          "set": {
+            "fullscreen": "true"
+          }
+        }
+      ]
+    },
+    {
+      "id": "resolution",
+      "label": "Internal resolution",
+      "group": "Video",
+      "help": "Development settings; higher resolution still needs gameplay and effects validation.",
+      "defaults": {
+        "resolution": "640x528"
+      },
+      "choices": [
+        {
+          "label": "Original (1\u00d7)",
+          "set": {
+            "resolution": "640x528"
+          }
+        },
+        {
+          "label": "2\u00d7",
+          "set": {
+            "resolution": "1280x720"
+          }
+        },
+        {
+          "label": "3\u00d7",
+          "set": {
+            "resolution": "1920x1080"
+          }
+        },
+        {
+          "label": "4\u00d7",
+          "set": {
+            "resolution": "2560x1440"
+          }
+        },
+        {
+          "label": "6\u00d7",
+          "set": {
+            "resolution": "3840x2160"
+          }
+        }
+      ]
+    },
+    {
+      "id": "backend",
+      "label": "Graphics backend",
+      "group": "Video",
+      "defaults": {
+        "backend": "Vulkan"
+      },
+      "choices": [
+        {
+          "label": "Vulkan",
+          "set": {
+            "backend": "Vulkan"
+          }
+        },
+        {
+          "label": "OpenGL",
+          "set": {
+            "backend": "OpenGL"
+          }
+        }
+      ]
+    }
+  ],
+  "saves": [
+    "{data}/user/GC",
+    "{data}/user/Config",
+    "{data}/user/config.ini"
+  ],
+  "folders": {
+    "game": [
+      {
+        "path": "{data}/cache/builds"
+      }
+    ],
+    "saves": [
+      {
+        "path": "{data}/user/GC"
+      }
+    ],
+    "logs": [
+      {
+        "path": "{data}/logs"
+      }
+    ]
+  },
+  "exit_codes": {
+    "20": "Missing, unsupported or mismatched discs. Choose Twin Snakes Disc 1 and Disc 2 from the same region and revision.",
+    "21": "Setup dependency or filesystem error. See the local logs and development requirements.",
+    "22": "Native compilation failed. See the local build log.",
+    "24": "This installation is already building or running.",
+    "25": "The game runtime stopped with an error. This is a development build."
+  }
+}
