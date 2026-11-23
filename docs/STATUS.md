@@ -9,7 +9,7 @@ The Windows prototype reaches the title screen with a native boot module. The US
 | Disc identity and revision validation | Both discs: GGSEA4, revision 0; main executables have identical SHA-256. Full normalized-disc hashes recorded in supported-builds.json. |
 | Native game module | Local setup extracted both RVZ discs and built one shared native boot module. The main game REL was translated in a separate experiment, with runtime integration outstanding. |
 | Boot / gameplay | Disc 1 reached the main menu at about 60 FPS with the idle fix. Disc 2 advanced at normal speed in a headless boot test. Gameplay and the disc transition still need verification. |
-| Audio / cutscenes / codec | Cubeb audio was active while the Vulkan run held normal game speed. The tester reported clear audio in the updated build. Codec conversations and gameplay audio still need verification. |
+| Audio / cutscenes / codec | The updated main menu had clear audio. Frame drops and audio stutter still occur during a cutscene. Codec conversations and gameplay audio still need verification. |
 | Controller | Rebuilt runtime detected an XInput controller and assigned it to port 1 without a config file. In-game response and reconnection still need verification. |
 | Save / load / disc transition | Not tested |
 | Complete playthrough | Not tested |

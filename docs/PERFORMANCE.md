@@ -10,13 +10,15 @@ With unused mod callbacks removed, the C module measured `0.34` median speed ove
 
 Dispatch sampling showed that the GameCube scheduler dominated native dispatch while the dedicated idle thread repeatedly yielded. For USA revision 0, the runtime now calls its existing idle handler after that thread returns from `OSYieldThread`. This advances to the next scheduled hardware event using the original clock. The headless boot comparison measured `0.307` median speed over 23 samples before the idle fix and `0.999` over 20 samples with it, with normal shutdown on both runs. The setting is limited to the supported revision. Both discs share the same DOL.
 
-The staged runtime ran the Disc 1 startup logos and opening video with Vulkan and Cubeb audio. It measured `1.000` median speed, `59.932` video updates per second and `29.984` rendered FPS across 46 samples. The run exited normally. A separate manual test reached the main menu at about 60 FPS. The tester reported clear audio with the updated window running alone. Disc 2 measured `0.999` median speed over 15 headless boot samples and exited normally. Gameplay pacing, codec audio and the disc transition still need verification.
+The staged runtime ran the Disc 1 startup logos and opening video with Vulkan and Cubeb audio. It measured `1.000` median speed, `59.932` video updates per second and `29.984` rendered FPS across 46 samples. Individual clock-speed samples ranged from `0.627` to `1.573` around boot and video transitions. A separate manual test reached the main menu at about 60 FPS with clear audio, then reported frame drops, apparent speed changes and audio stutter during a cutscene. Disc 2 measured `0.999` median speed over 15 headless boot samples and exited normally.
+
+A faster-sampled Disc 1 run with video and audio output disabled measured `1.000` median speed in both CPU modes. The JIT range was `0.976–1.027` over 193 samples and the hybrid range was `0.919–1.100` over 192 samples. These runs cover early boot and the opening video. The worst Vulkan dips were absent in this comparison. The cause of cutscene stutter and the timing of later scenes remain open.
 
 ```powershell
 python scripts/benchmark_boot.py --data .local/player --runner .local/runtime/moderngekko-run.exe
 ```
 
-Use an idle machine and the same disc, graphics backend and scene for comparisons. The headless run isolates the CPU path. `--windowed` adds normal Vulkan and audio output. For gameplay, measure frame pacing and compare input response, audio timing and cutscene timing with the retail disc under Dolphin. Generated outputs, logs and capture files stay local.
+Use an idle machine and the same disc, graphics backend and scene for comparisons. The default headless run isolates the CPU path. `--windowed` adds normal Vulkan presentation and audio output. The pinned runtime raised an ImGui context assertion during an experimental offscreen Vulkan run, so that configuration yielded no hybrid result. For gameplay, measure frame pacing and compare input response, audio timing and cutscene timing with the retail disc under Dolphin. Generated outputs, logs and capture files stay local.
 
 ## Tool comparisons
 

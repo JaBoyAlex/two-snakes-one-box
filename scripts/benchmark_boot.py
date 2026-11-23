@@ -17,8 +17,8 @@ def benchmark(mode, runner, game, module, work, windowed, seconds):
     command_dir.mkdir(parents=True)
     user = work / 'user'
     user.mkdir()
-    backend = 'Vulkan' if windowed else 'Null'
     (user / 'config.ini').write_text('resolution=640x528\nbackend=Vulkan\nfullscreen=false\n')
+    backend = 'Vulkan' if windowed else 'Null'
     env = dict(os.environ, MODERNGEKKO_STATICRECOMP='1' if mode == 'aot' else '0')
     env.pop('STATICRECOMP_DISPATCH_SAMPLES', None)
     env.pop('STATICRECOMP_TRACE_FILE', None)
@@ -38,17 +38,18 @@ def benchmark(mode, runner, game, module, work, windowed, seconds):
         forced_stop = False
         try:
             while process.poll() is None and time.monotonic() - start < seconds + 90:
-                time.sleep(1)
+                time.sleep(0.25)
                 try:
                     state = dict(line.split('=', 1) for line in (control / 'status.txt').read_text().splitlines() if '=' in line)
-                    speed = float(state.get('speed', '0'))
-                    vps = float(state.get('vps', '0'))
-                    fps = float(state.get('fps', '0'))
-                    frame = int(state.get('frame_count', '0'))
-                except (OSError, ValueError):
+                    speed = float(state['speed'])
+                    frame = int(state['frame_count'])
+                    if windowed:
+                        vps = float(state['vps'])
+                        fps = float(state['fps'])
+                except (OSError, ValueError, KeyError):
                     continue
                 now = time.monotonic()
-                if state.get('booted') != '1' or not frame:
+                if state.get('booted') != '1' or state.get('state') != 'running' or not frame:
                     continue
                 if began_sampling is None:
                     began_sampling = now
@@ -74,13 +75,15 @@ def benchmark(mode, runner, game, module, work, windowed, seconds):
                     process.terminate()
                     process.wait(timeout=5)
 
-    summary = {'cpu': mode, 'graphics': backend, 'exit_code': process.returncode,
+    summary = {'cpu': mode, 'graphics': backend, 'headless': not windowed, 'exit_code': process.returncode,
                'forced_stop': forced_stop,
                'sample_count': len(samples), 'samples': samples}
     if samples:
         metrics = ['speed', 'drawn_fps', 'vps', 'fps'] if windowed else ['speed', 'drawn_fps']
         summary.update({f'median_{key}': round(statistics.median(sample[key] for sample in samples), 3)
                         for key in metrics})
+        summary['minimum_speed'] = round(min(sample['speed'] for sample in samples), 3)
+        summary['maximum_speed'] = round(max(sample['speed'] for sample in samples), 3)
     (work / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     print(json.dumps({key: value for key, value in summary.items() if key != 'samples'}), flush=True)
     return process.returncode == 0 and bool(samples)
