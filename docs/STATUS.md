@@ -14,7 +14,7 @@ The Windows prototype reaches the title screen with a native boot module and fal
 | Save / load / disc transition | Not tested |
 | Complete playthrough | Not tested |
 | RecompLauncher schema | Passes the official current schema; separate disc inputs and prepare/start entry points. |
-| RecompLauncher installed-package test | Not tested |
+| RecompLauncher installed-package test | Private Windows ZIP built with manifest, local compiler tools and MSVC runtime files. Ran its launcher and disc inspection locally. Actual in-launcher installation and a clean Windows test remain pending. |
 | Monitor-native fullscreen / higher internal resolution | Runtime settings are wired in the manifest. Output size, effects and performance still need verification. |
 | Unlocked frame rate | Planned; no patch enabled |
 

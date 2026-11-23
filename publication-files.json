@@ -21,6 +21,7 @@
   "scripts/check_publication.py",
   "scripts/package_windows.py",
   "patches/moderngekko-auto-gamepad.patch",
+  "patches/moderngekko-no-empty-mod-hooks.patch",
   "patches/recompcore-auto-gamepad.patch",
   "docs/BUILDING.md",
   "docs/ROADMAP.md",

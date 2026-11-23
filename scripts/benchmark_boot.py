@@ -35,8 +35,9 @@ def benchmark(mode, runner, game, module, work, windowed, seconds):
         began_sampling = None
         previous_sample = None
         samples = []
+        forced_stop = False
         try:
-            while process.poll() is None and time.monotonic() - start < seconds + 55:
+            while process.poll() is None and time.monotonic() - start < seconds + 90:
                 time.sleep(1)
                 try:
                     state = dict(line.split('=', 1) for line in (control / 'status.txt').read_text().splitlines() if '=' in line)
@@ -67,12 +68,14 @@ def benchmark(mode, runner, game, module, work, windowed, seconds):
                 command_file.write_text('command=stop\n', encoding='ascii')
                 command_file.rename(command_dir / 'stop.txt')
                 try:
-                    process.wait(timeout=8)
+                    process.wait(timeout=20)
                 except subprocess.TimeoutExpired:
+                    forced_stop = True
                     process.terminate()
                     process.wait(timeout=5)
 
     summary = {'cpu': mode, 'graphics': backend, 'exit_code': process.returncode,
+               'forced_stop': forced_stop,
                'sample_count': len(samples), 'samples': samples}
     if samples:
         metrics = ['speed', 'drawn_fps', 'vps', 'fps'] if windowed else ['speed', 'drawn_fps']

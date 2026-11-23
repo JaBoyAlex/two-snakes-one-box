@@ -1,0 +1,23 @@
+diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
+index f9b5405..7766af9 100644
+--- a/src/runtime/dolphin_runtime.cpp
++++ b/src/runtime/dolphin_runtime.cpp
+@@ -700,11 +706,13 @@ RuntimeCreateResult Runtime::Create(RuntimeConfig config) {
+     recomp_source = StaticRecompModuleSource::Attached(
+         reinterpret_cast<const StaticRecompModuleDesc *>(
+             impl->config.module.descriptor));
+-  recomp_source.host_call = &ModManager::HostCall;
+-  recomp_source.host_call_contains = &ModManager::HostCallContains;
+-  recomp_source.host_call_range_contains =
+-      &ModManager::HostCallRangeContains;
+-  recomp_source.host_call_user = impl->mods.get();
++  if (!impl->mods->Empty()) {
++    recomp_source.host_call = &ModManager::HostCall;
++    recomp_source.host_call_contains = &ModManager::HostCallContains;
++    recomp_source.host_call_range_contains =
++        &ModManager::HostCallRangeContains;
++    recomp_source.host_call_user = impl->mods.get();
++  }
+   jit.SetStaticRecompModuleSource(std::move(recomp_source));
+ 
+   s_runtime_active = true;

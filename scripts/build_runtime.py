@@ -31,6 +31,7 @@ def main():
         if revision != expected:
             raise SystemExit(f'Source revision does not match dependencies.lock.json: {directory.name}')
     apply_patch(source, 'moderngekko-auto-gamepad.patch')
+    apply_patch(source, 'moderngekko-no-empty-mod-hooks.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-auto-gamepad.patch')
     subprocess.run(['cmake', '-S', str(source), '-B', str(build), '-G', 'Ninja',
                     '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_TESTING=OFF',

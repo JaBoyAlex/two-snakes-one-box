@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -9,6 +10,7 @@ import subprocess
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
+VC_FILES = ['msvcp140.dll', 'msvcp140_atomic_wait.dll', 'vcruntime140.dll', 'vcruntime140_1.dll']
 
 
 def main():
@@ -16,11 +18,17 @@ def main():
     parser.add_argument('--runtime', type=Path, default=ROOT / '.local/runtime')
     parser.add_argument('--launcher', type=Path, default=ROOT / '.local/build/launcher/TwinSnakes.exe')
     parser.add_argument('--tools', type=Path, required=True, help='Directory holding python, cmake, ninja and llvm-mingw')
+    parser.add_argument('--vc-runtime-dir', type=Path, help='Visual Studio x64 Microsoft.VC143.CRT directory')
     parser.add_argument('--output', type=Path, default=ROOT / 'dist')
     parser.add_argument('--version', default='0.1.0-dev')
     args = parser.parse_args()
     if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?', args.version):
         parser.error('--version must be a version such as 0.1.0-dev')
+    vc_runtime = args.vc_runtime_dir
+    if vc_runtime is None and os.environ.get('VCToolsRedistDir'):
+        vc_runtime = Path(os.environ['VCToolsRedistDir']) / 'x64/Microsoft.VC143.CRT'
+    if vc_runtime is None or any(not (vc_runtime / name).is_file() for name in VC_FILES):
+        parser.error('Supply the x64 Microsoft.VC143.CRT redistributable directory with --vc-runtime-dir')
     for required in [args.launcher, args.runtime / 'moderngekko-run.exe', args.runtime / 'dolrecomp.exe',
                      args.runtime / 'dolphin-tool.exe', args.tools / 'python/python.exe',
                      args.tools / 'cmake/bin/cmake.exe', args.tools / 'ninja/ninja.exe',
@@ -39,6 +47,8 @@ def main():
     shutil.copytree(ROOT / 'docs', stage / 'docs')
     shutil.copy2(args.launcher, stage / 'TwinSnakes.exe')
     shutil.copytree(args.runtime, stage / 'runtime')
+    for name in VC_FILES:
+        shutil.copy2(vc_runtime / name, stage / 'runtime' / name)
     shutil.copytree(args.tools / 'python', stage / 'python')
     for name in ['cmake', 'ninja', 'llvm-mingw']:
         shutil.copytree(args.tools / name, stage / 'tools' / name)
@@ -58,6 +68,7 @@ def main():
     # Verify the same executable named by prepare and start can find its Python
     # runtime and entry point; this does not constitute a gameplay check.
     subprocess.run([str(stage / 'TwinSnakes.exe'), '--help'], check=True)
+    subprocess.run([str(stage / 'runtime/moderngekko-run.exe'), '--help'], check=True)
     args.output.mkdir(parents=True, exist_ok=True)
     archive = args.output / f'TwinSnakes-Recomp-v{args.version}-Windows-x64.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
