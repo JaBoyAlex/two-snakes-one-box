@@ -1,0 +1,95 @@
+import hashlib
+from pathlib import Path
+import sys
+import tempfile
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'app'))
+from discs import DiscError
+import twin_snakes
+
+
+class PrepareTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.build = self.root / 'build'
+        self.disc = SimpleNamespace(number=0, game_id='GGSEA4',
+                                    dol_sha256=hashlib.sha256(b'test DOL').hexdigest())
+        tool_patch = patch.object(twin_snakes, 'tool', side_effect=lambda _, name: self.root / name)
+        tool_patch.start()
+        self.addCleanup(tool_patch.stop)
+
+    @staticmethod
+    def write_extraction(folder):
+        (folder / 'sys').mkdir(parents=True)
+        (folder / 'sys/main.dol').write_bytes(b'test DOL')
+
+    def test_extract_retry_does_not_reuse_an_incomplete_folder(self):
+        def interrupted(command, *_args, **_kwargs):
+            self.write_extraction(command[-1])
+            raise twin_snakes.SetupError('Interrupted extraction', 20)
+
+        with patch.object(twin_snakes, 'run', side_effect=interrupted):
+            with self.assertRaises(twin_snakes.SetupError):
+                twin_snakes.extract_disc(None, self.disc, self.build, self.root, None, None)
+        self.assertEqual(list(self.build.iterdir()), [])
+
+        def complete(command, *_args, **_kwargs):
+            self.write_extraction(command[-1])
+            (command[-1] / 'asset.dat').touch()
+
+        with patch.object(twin_snakes, 'run', side_effect=complete) as run:
+            extracted = twin_snakes.extract_disc(None, self.disc, self.build, self.root, None, None)
+            self.assertEqual(extracted, self.build / 'disc1')
+            self.assertTrue((extracted / 'asset.dat').is_file())
+            self.assertEqual(twin_snakes.extract_disc(None, self.disc, self.build, self.root, None, None),
+                             extracted)
+            run.assert_called_once()
+
+    def test_rejects_wrong_rel_before_publishing_extraction(self):
+        rel_layout = {'path': 'game.rel', 'sha256': hashlib.sha256(b'expected bytes').hexdigest()}
+
+        def extract_wrong_rel(command, *_args, **_kwargs):
+            self.write_extraction(command[-1])
+            (command[-1] / rel_layout['path']).write_bytes(b'wrong bytes')
+
+        with patch.object(twin_snakes, 'run', side_effect=extract_wrong_rel):
+            with self.assertRaisesRegex(DiscError, 'does not match the verified revision'):
+                twin_snakes.extract_disc(None, self.disc, self.build, self.root, None, rel_layout)
+        self.assertFalse((self.build / 'disc1').exists())
+
+    def test_link_retry_does_not_reuse_partial_native_output(self):
+        self.write_extraction(self.build / 'disc1')
+        attempts = 0
+
+        def compile_module(command, *_args, **_kwargs):
+            nonlocal attempts
+            if command[1] == '--gamecube':
+                (command[-1] / 'generated').mkdir(parents=True, exist_ok=True)
+            elif command[1] == '--build':
+                attempts += 1
+                directory = command[2]
+                suffix = '.dll' if sys.platform == 'win32' else ('.dylib' if sys.platform == 'darwin' else '.so')
+                module = directory / ('gGGSEA4_recomp' + suffix)
+                self.assertFalse(module.is_file())
+                directory.mkdir(parents=True, exist_ok=True)
+                module.write_bytes(b'partial output' if attempts == 1 else b'linked output')
+                if attempts == 1:
+                    raise twin_snakes.SetupError('Interrupted link', 22)
+
+        args = (None, self.disc, self.build, self.root, {}, 'cmake', 'cc', None)
+        with patch.object(twin_snakes, 'run', side_effect=compile_module):
+            with self.assertRaises(twin_snakes.SetupError):
+                twin_snakes.build_disc(*args)
+            _, module = twin_snakes.build_disc(*args)
+            self.assertEqual(module.read_bytes(), b'linked output')
+            self.assertEqual(twin_snakes.build_disc(*args)[1], module)
+        self.assertEqual(attempts, 2)
+
+
+if __name__ == '__main__':
+    unittest.main()

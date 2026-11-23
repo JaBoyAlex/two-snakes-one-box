@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -17,7 +18,7 @@ from discs import DiscError, inspect_iso, validate_pair
 from rel_image import link_rel_image
 
 ROOT = Path(__file__).resolve().parents[1]
-BUILD_FORMAT = 2
+BUILD_FORMAT = 3
 
 
 class SetupError(Exception):
@@ -182,22 +183,38 @@ def compiler_environment(runtime):
     return env, cmake, compiler
 
 
-def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layout=None):
-    extracted = build / f'disc{disc.number + 1}'
+def verify_extraction(extracted, disc, rel_layout):
     dol = extracted / 'sys/main.dol'
-    if not dol.is_file():
-        run([tool(runtime, 'dolrecomp'), 'extract', iso, extracted], log, code=20)
     if digest(dol) != disc.dol_sha256:
         raise DiscError('Extracted executable does not match the selected disc.')
     if rel_layout:
         rel = extracted / rel_layout['path']
         if digest(rel) != rel_layout['sha256']:
             raise DiscError('Extracted game module does not match the verified revision.')
+
+
+def extract_disc(iso, disc, build, runtime, log, rel_layout):
+    extracted = build / f'disc{disc.number + 1}'
+    if extracted.is_dir():
+        verify_extraction(extracted, disc, rel_layout)
+        return extracted
+    build.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=f'{extracted.name}-', dir=build) as temp_dir:
+        staging = Path(temp_dir)
+        run([tool(runtime, 'dolrecomp'), 'extract', iso, staging], log, code=20)
+        verify_extraction(staging, disc, rel_layout)
+        staging.rename(extracted)
+    return extracted
+
+
+def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layout=None):
+    extracted = extract_disc(iso, disc, build, runtime, log, rel_layout)
+    dol = extracted / 'sys/main.dol'
     module_build = build / 'modules' / disc.dol_sha256[:16]
     suffix = '.dll' if os.name == 'nt' else ('.dylib' if sys.platform == 'darwin' else '.so')
     module = module_build / f'g{disc.game_id}_recomp{suffix}'
     module_ready = module_build / 'link.complete'
-    if module.is_file() and (not rel_layout or module_ready.is_file()):
+    if module.is_file() and module_ready.is_file():
         return extracted, module
     generated_parent = build / 'generated' / disc.dol_sha256[:16]
     compiler_input = dol
@@ -206,12 +223,12 @@ def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layo
         compiler_input = generated_parent / 'linked.dol'
         compiler_input.parent.mkdir(parents=True, exist_ok=True)
         compiler_input.write_bytes(link_rel_image(
-            dol.read_bytes(), rel.read_bytes(),
+            dol.read_bytes(), (extracted / rel_layout['path']).read_bytes(),
             load_address=int(rel_layout['load_address'], 16),
             bss_address=int(rel_layout['bss_address'], 16)))
         recompiler_options += ['--cpu', 'gekko']
-        # An interrupted link can leave an output without its completion record.
-        module.unlink(missing_ok=True)
+    # An interrupted link can leave an output without its completion record.
+    module.unlink(missing_ok=True)
     run([tool(runtime, 'dolrecomp'), *recompiler_options, compiler_input, generated_parent], log, env=env)
     generated = generated_parent / 'generated'
     shutil.copy2(compiler_input, generated / 'main.dol')
@@ -224,6 +241,7 @@ def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layo
          f'-DPython3_EXECUTABLE={sys.executable}', f'-DGAME_ID={disc.game_id}',
          f'-DGENERATED_DIR={generated}', f'-DGXRUNTIME_DIR={sdk / "GXRuntime"}',
          f'-DCHASSIS_ABI_DIR={sdk / "Source/Core/Core/PowerPC/StaticRecomp"}'], log, env=env)
+
     def report_compilation(line):
         match = re.match(r'^\[(\d+)/([1-9]\d*)\] (?:Building C object|Linking C shared)', line)
         if match:
@@ -233,10 +251,9 @@ def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layo
 
     run([cmake, '--build', module_build, '-j', str(min(8, os.cpu_count() or 2))], log, env=env,
         on_line=report_compilation)
-    if not module.is_file():
+    if not module.is_file() or module.stat().st_size == 0:
         raise SetupError('The compiler did not produce the expected native module.', 22)
-    if rel_layout:
-        module_ready.touch()
+    module_ready.touch()
     return extracted, module
 
 

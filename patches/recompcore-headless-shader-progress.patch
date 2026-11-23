@@ -1,0 +1,26 @@
+diff --git a/Source/Core/VideoCommon/ShaderCache.cpp b/Source/Core/VideoCommon/ShaderCache.cpp
+index 565e4f42f8..c1bc2ac3fa 100644
+--- a/Source/Core/VideoCommon/ShaderCache.cpp
++++ b/Source/Core/VideoCommon/ShaderCache.cpp
+@@ -171,6 +171,9 @@ void ShaderCache::WaitForAsyncCompiler()
+   bool running = true;
+ 
+   constexpr auto update_ui_progress = [](size_t completed, size_t total) {
++    if (!ImGui::GetCurrentContext())
++      return;
++
+     const float center_x = ImGui::GetIO().DisplaySize.x * 0.5f;
+     const float center_y = ImGui::GetIO().DisplaySize.y * 0.5f;
+     const float scale = ImGui::GetIO().DisplayFramebufferScale.x;
+@@ -201,8 +204,9 @@ void ShaderCache::WaitForAsyncCompiler()
+     m_async_shader_compiler->RetrieveWorkItems();
+   }
+ 
+-  // An extra Present to clear the screen
+-  g_presenter->Present();
++  // Clear the shader progress overlay when a host surface exists.
++  if (ImGui::GetCurrentContext())
++    g_presenter->Present();
+ }
+ 
+ template <typename SerializedUidType, typename UidType>

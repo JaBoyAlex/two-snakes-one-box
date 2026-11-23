@@ -26,6 +26,7 @@
   "patches/recompcore-auto-gamepad.patch",
   "patches/recompcore-fallback-fastmem.patch",
   "patches/recompcore-gamepad-bindings.patch",
+  "patches/recompcore-headless-shader-progress.patch",
   "patches/recompcore-twin-snakes-idle.patch",
   "patches/recompcore-verified-virtual-code.patch",
   "docs/BUILDING.md",
@@ -33,5 +34,6 @@
   "docs/STATUS.md",
   "docs/PERFORMANCE.md",
   "tests/test_discs.py",
+  "tests/test_prepare.py",
   "tests/test_rel_image.py"
 ]

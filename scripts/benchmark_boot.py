@@ -9,14 +9,13 @@ import tempfile
 import time
 
 
-def benchmark(mode, runner, game, module, work, windowed, seconds, load_state, dispatch_samples):
+def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load_state, dispatch_samples):
     control = work / 'control'
     command_dir = control / 'commands'
     command_dir.mkdir(parents=True)
     user = work / 'user'
     user.mkdir()
     (user / 'config.ini').write_text('resolution=640x528\nbackend=Vulkan\nfullscreen=false\n')
-    backend = 'Vulkan' if windowed else 'Null'
     env = dict(os.environ, MODERNGEKKO_STATICRECOMP='1' if mode == 'aot' else '0')
     env.pop('STATICRECOMP_DISPATCH_SAMPLES', None)
     env.pop('STATICRECOMP_TRACE_FILE', None)
@@ -102,7 +101,9 @@ def main():
                         help='Directory for isolated profiles and logs (default: system temporary directory)')
     parser.add_argument('--seconds', type=int, default=20)
     parser.add_argument('--mode', choices=['aot', 'jit', 'both'], default='both')
-    parser.add_argument('--windowed', action='store_true', help='Use Vulkan and normal audio instead of headless Null output')
+    display = parser.add_mutually_exclusive_group()
+    display.add_argument('--windowed', action='store_true', help='Use Vulkan with a visible window and normal audio')
+    display.add_argument('--offscreen-vulkan', action='store_true', help='Render with Vulkan without a window or audio output')
     args = parser.parse_args()
     if not 5 <= args.seconds <= 300:
         parser.error('--seconds must be between 5 and 300')
@@ -114,8 +115,10 @@ def main():
     work = (args.output.resolve() / str(time.time_ns()) if args.output else
             Path(tempfile.mkdtemp(prefix='TwinSnakesRecompBenchmark-')))
     modes = ['jit', 'aot'] if args.mode == 'both' else [args.mode]
+    backend = 'Vulkan' if args.windowed or args.offscreen_vulkan else 'Null'
     outcomes = [benchmark(mode, args.runner.resolve(strict=True), data / disc['root'],
-                          module, work / mode, args.windowed, args.seconds, load_state, args.dispatch_samples)
+                          module, work / mode, args.windowed, backend, args.seconds, load_state,
+                          args.dispatch_samples)
                 for mode in modes]
     print(f'Private logs and samples: {work}')
     return 0 if all(outcomes) else 1

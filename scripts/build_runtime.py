@@ -39,6 +39,7 @@ def main():
                 after=('recompcore-auto-gamepad.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-fastmem.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-verified-virtual-code.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-headless-shader-progress.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-twin-snakes-idle.patch')
     subprocess.run(['cmake', '-S', str(source), '-B', str(build), '-G', 'Ninja',
                     '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_TESTING=OFF',
