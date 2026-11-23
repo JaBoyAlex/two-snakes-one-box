@@ -70,7 +70,7 @@ def main():
     subprocess.run([str(stage / 'TwinSnakes.exe'), '--help'], check=True)
     subprocess.run([str(stage / 'runtime/moderngekko-run.exe'), '--help'], check=True)
     args.output.mkdir(parents=True, exist_ok=True)
-    archive = args.output / f'TwinSnakes-Recomp-v{args.version}-Windows-x64.zip'
+    archive = args.output / f'Two-Snakes-One-Box-v{args.version}-Windows-x64.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
         for path in sorted(stage.rglob('*')):
             if path.is_file():

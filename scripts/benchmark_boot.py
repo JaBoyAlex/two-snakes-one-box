@@ -11,7 +11,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def benchmark(mode, runner, game, module, work, windowed, seconds):
+def benchmark(mode, runner, game, module, work, windowed, seconds, load_state, dispatch_samples):
     control = work / 'control'
     command_dir = control / 'commands'
     command_dir.mkdir(parents=True)
@@ -23,11 +23,15 @@ def benchmark(mode, runner, game, module, work, windowed, seconds):
     env.pop('STATICRECOMP_DISPATCH_SAMPLES', None)
     env.pop('STATICRECOMP_TRACE_FILE', None)
     env.pop('STATICRECOMP_FALLBACK_RANGES', None)
+    if dispatch_samples and mode == 'aot':
+        env['STATICRECOMP_DISPATCH_SAMPLES'] = '1'
     command = [str(runner), '--game', str(game), '--module', str(module),
                '--user-dir', str(user), '--automation-dir', str(control),
                '--graphics', backend, '--no-mods']
     if not windowed:
         command.append('--headless')
+    if load_state:
+        command += ['--load-state', str(load_state)]
 
     with (work / 'runtime.log').open('wb') as log:
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=env)
@@ -94,6 +98,8 @@ def main():
     parser.add_argument('--data', required=True, type=Path)
     parser.add_argument('--runner', required=True, type=Path)
     parser.add_argument('--module', type=Path, help='Test a candidate module instead of the prepared module')
+    parser.add_argument('--load-state', type=Path, help='Replay a local Disc 1 save state for a scene comparison')
+    parser.add_argument('--dispatch-samples', action='store_true', help='Log the busiest native dispatch sites on shutdown')
     parser.add_argument('--output', type=Path, default=ROOT / '.local/benchmarks')
     parser.add_argument('--seconds', type=int, default=20)
     parser.add_argument('--mode', choices=['aot', 'jit', 'both'], default='both')
@@ -105,10 +111,11 @@ def main():
     prepared = json.loads((data / 'prepared.json').read_text())
     disc = prepared['discs'][0]
     module = args.module.resolve(strict=True) if args.module else data / disc['module']
+    load_state = args.load_state.resolve(strict=True) if args.load_state else None
     work = args.output.resolve() / str(time.time_ns())
     modes = ['jit', 'aot'] if args.mode == 'both' else [args.mode]
     outcomes = [benchmark(mode, args.runner.resolve(strict=True), data / disc['root'],
-                          module, work / mode, args.windowed, args.seconds)
+                          module, work / mode, args.windowed, args.seconds, load_state, args.dispatch_samples)
                 for mode in modes]
     print(f'Private logs and samples: {work}')
     return 0 if all(outcomes) else 1
