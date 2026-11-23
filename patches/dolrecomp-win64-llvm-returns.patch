@@ -1,0 +1,15 @@
+diff --git a/src/backend/llvm/emitter.cpp b/src/backend/llvm/emitter.cpp
+index 6e44b85..5baa42a 100644
+--- a/src/backend/llvm/emitter.cpp
++++ b/src/backend/llvm/emitter.cpp
+@@ -36,7 +36,9 @@ FunctionEmitter::FunctionEmitter(LLVMContext &context, Module &module,
+       expected_ram_size_(options.ram_size),
+       expected_mem2_size_(options.mem2_size) {
+   const Triple triple(module_.getTargetTriple());
+-  intrinsic_escapes_ = triple.isX86() && !modern_runtime_;
++  // Return through the generated frames on Windows x64 so they restore the
++  // nonvolatile XMM registers before control passes back to the host.
++  intrinsic_escapes_ = triple.isX86() && !triple.isOSWindows() && !modern_runtime_;
+   cold_escapes_ = modern_runtime_ || intrinsic_escapes_ ||
+                   (triple.isAArch64() && !triple.isOSWindows());
+   for (u32 index = 0; index < range_count_; index++) {

@@ -1,0 +1,31 @@
+diff --git a/GXRuntime/include/core/cpu.h b/GXRuntime/include/core/cpu.h
+index e242b00259..cd1e114aaf 100644
+--- a/GXRuntime/include/core/cpu.h
++++ b/GXRuntime/include/core/cpu.h
+@@ -404,6 +404,7 @@ static inline bool ppc_fp_available_inline(CPUState* cpu, u32 cia) {
+ }
+ void ppc_fallback_instruction(CPUState* cpu, u32 raw, u32 cia);
+ bool ppc_host_call(CPUState* cpu, u32 address);
++bool ppc_native_region_available(CPUState* cpu, u32 start, u32 end);
+ void ppc_system_call_exception(CPUState* cpu, u32 cia);
+ void ppc_dsi_exception(CPUState* cpu, u32 ea, u32 cia, u32 dsisr);
+ void ppc_alignment_exception(CPUState* cpu, u32 ea, u32 cia);
+diff --git a/GXRuntime/src/core/cpu.c b/GXRuntime/src/core/cpu.c
+index 345b9602dd..cc11396421 100644
+--- a/GXRuntime/src/core/cpu.c
++++ b/GXRuntime/src/core/cpu.c
+@@ -141,6 +141,14 @@ bool ppc_host_call(CPUState* cpu, u32 address) {
+     return cpu->host_call ? cpu->host_call(cpu, address) : false;
+ }
+ 
++bool ppc_native_region_available(CPUState* cpu, u32 start, u32 end) {
++    // This runtime has no range query for host calls. Only chain native code
++    // when no hook can intercept execution within the region.
++    (void)start;
++    (void)end;
++    return !cpu || !cpu->host_call;
++}
++
+ void ppc_system_call_exception(CPUState* cpu, u32 cia) {
+     ppc_take_exception(cpu, PPC_EXC_SYSTEM_CALL, PPC_VECTOR_SYSTEM_CALL, cia + 4u, 0);
+ }

@@ -1,4 +1,4 @@
-"""Compare hybrid AOT and JIT on one prepared disc with isolated runtime settings."""
+"""Benchmark CPU modes and native modules with isolated runtime settings."""
 import argparse
 import json
 import os
@@ -36,6 +36,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
         began_sampling = None
         previous_sample = None
         samples = []
+        completed = False
         forced_stop = False
         try:
             while process.poll() is None and time.monotonic() - start < seconds + 90:
@@ -63,6 +64,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                         samples[-1].update({'vps': vps, 'fps': fps})
                 previous_sample = now, frame
                 if now - began_sampling >= seconds + 3:
+                    completed = True
                     break
         finally:
             if process.poll() is None:
@@ -77,7 +79,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                     process.wait(timeout=5)
 
     summary = {'cpu': mode, 'graphics': backend, 'headless': not windowed, 'exit_code': process.returncode,
-               'forced_stop': forced_stop,
+               'completed': completed, 'forced_stop': forced_stop,
                'sample_count': len(samples), 'samples': samples}
     if samples:
         metrics = ['speed', 'drawn_fps', 'vps', 'fps'] if windowed else ['speed', 'drawn_fps']
@@ -87,7 +89,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
         summary['maximum_speed'] = round(max(sample['speed'] for sample in samples), 3)
     (work / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     print(json.dumps({key: value for key, value in summary.items() if key != 'samples'}), flush=True)
-    return process.returncode == 0 and bool(samples)
+    return process.returncode == 0 and completed and not forced_stop and bool(samples)
 
 
 def main():
@@ -95,31 +97,45 @@ def main():
     parser.add_argument('--data', required=True, type=Path)
     parser.add_argument('--runner', required=True, type=Path)
     parser.add_argument('--module', type=Path, help='Test a candidate module instead of the prepared module')
+    parser.add_argument('--compare-module', type=Path,
+                        help='Compare a candidate against --module or the prepared module in both run orders')
     parser.add_argument('--load-state', type=Path, help='Replay a local Disc 1 save state for a scene comparison')
     parser.add_argument('--dispatch-samples', action='store_true', help='Log the busiest native dispatch sites on shutdown')
     parser.add_argument('--output', type=Path,
                         help='Directory for isolated profiles and logs (default: system temporary directory)')
     parser.add_argument('--seconds', type=int, default=20)
-    parser.add_argument('--mode', choices=['aot', 'jit', 'both'], default='both')
+    parser.add_argument('--mode', choices=['aot', 'jit', 'both'],
+                        help='Default: both, or aot for --compare-module')
     display = parser.add_mutually_exclusive_group()
     display.add_argument('--windowed', action='store_true', help='Use Vulkan with a visible window and normal audio')
     display.add_argument('--offscreen-vulkan', action='store_true', help='Render with Vulkan without a window or audio output')
     args = parser.parse_args()
     if not 5 <= args.seconds <= 300:
         parser.error('--seconds must be between 5 and 300')
+    if args.compare_module and args.mode not in (None, 'aot'):
+        parser.error('--compare-module requires AOT mode')
     data = args.data.resolve()
     prepared = json.loads((data / 'prepared.json').read_text())
     disc = prepared['discs'][0]
     module = args.module.resolve(strict=True) if args.module else data / disc['module']
+    runner = args.runner.resolve(strict=True)
     load_state = args.load_state.resolve(strict=True) if args.load_state else None
     work = (args.output.resolve() / str(time.time_ns()) if args.output else
             Path(tempfile.mkdtemp(prefix='TwinSnakesRecompBenchmark-')))
-    modes = ['jit', 'aot'] if args.mode == 'both' else [args.mode]
     backend = 'Vulkan' if args.windowed or args.offscreen_vulkan else 'Null'
-    outcomes = [benchmark(mode, args.runner.resolve(strict=True), data / disc['root'],
-                          module, work / mode, args.windowed, backend, args.seconds, load_state,
-                          args.dispatch_samples)
-                for mode in modes]
+    if args.compare_module:
+        candidate = args.compare_module.resolve(strict=True)
+        cases = [('reference-first', 'aot', module), ('candidate-second', 'aot', candidate),
+                 ('candidate-first', 'aot', candidate), ('reference-second', 'aot', module)]
+    else:
+        modes = ['jit', 'aot'] if args.mode in (None, 'both') else [args.mode]
+        cases = [(mode, mode, module) for mode in modes]
+    outcomes = []
+    for label, mode, selected_module in cases:
+        print(f'Running {label}', flush=True)
+        outcomes.append(benchmark(mode, runner, data / disc['root'], selected_module,
+                                  work / label, args.windowed, backend, args.seconds,
+                                  load_state, args.dispatch_samples))
     print(f'Private logs and samples: {work}')
     return 0 if all(outcomes) else 1
 

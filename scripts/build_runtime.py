@@ -43,6 +43,8 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-headless-shader-progress.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-disc-mount-log.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-twin-snakes-idle.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-llvm-region-check.patch')
+    apply_patch(source / 'vendor/dolphin/DolRecomp', 'dolrecomp-win64-llvm-returns.patch')
     subprocess.run(['cmake', '-S', str(source), '-B', str(build), '-G', 'Ninja',
                     '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_TESTING=OFF',
                     f'-DPython3_EXECUTABLE={os.sys.executable}',

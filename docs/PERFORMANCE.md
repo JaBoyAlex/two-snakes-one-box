@@ -42,6 +42,8 @@ Use an idle machine and the same disc, graphics backend and scene for comparison
 
 Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay. Benchmark profiles and logs default to a subdirectory of the system temporary directory. Use `--output PATH` to retain traces elsewhere. One run in a synced workspace failed to replace the test profile's filesystem metadata (`IOS_FS: Failed to rename temporary FST file`). Repeat runs with isolated profiles outside the synced workspace completed successfully.
 
+Use `--compare-module PATH` to compare a native module against the prepared module on the same runner. Add `--module PATH` to supply a different reference. The benchmark runs reference, candidate, candidate, reference in separate profiles to expose run-order effects. A run that exits before the requested sampling window ends is marked incomplete even if it exits normally.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
@@ -70,10 +72,24 @@ The experimental builder joins the boot executable and the relocated on-disc sec
 
 The full module linked successfully and executed REL code at multiple addresses during gameplay. The first matched headless gameplay replay measured median speed of `0.561` with the boot-only module and `0.397` with the full module over 41 samples each. Both exited normally. The full module's runtime reported about 15 million instruction fallback calls in that replay. A second gameplay comparison was stopped early when work paused. The later cutscene replay measured median speed of `1.004` with the boot-only module and `0.990` with the full module over 41 samples each. The full module dipped to `0.837` during that replay. The main module remains experimental.
 
+Repeating the early gameplay comparison with the currently staged Windows runner and alternating the module order measured `0.745` and `0.739` for the boot-only build and `0.417` and `0.422` for the full module. Each run completed the requested sampling window, collected 29 samples, and exited normally. The boot-only module stays selected for regular launches.
+
 In a later profile of the same checkpoint, 9,568 of 9,570 sampled instruction fallback calls were PowerPC data-cache flush or invalidate operations. Two call sites accounted for nearly all of those samples. The runtime continues to process those operations through its cache-coherency path.
 
 A private cache-line trial reused the fallback JIT's single-line invalidation path and skipped searching native chunks for lines outside the small set of compiled ranges. The full module's gameplay replay improved from `0.395` to `0.437` over 41 samples per build. Reversing test order measured `0.429` with the trial and `0.418` with the comparison build over 33 samples each. Gameplay remains below real time. The trial stayed local while the larger native dispatch cost remains unresolved.
 
+A Windows instruction-pointer sample of the busiest thread during the same headless gameplay replay landed inside the full native module 408 times out of 574. Paired-single load, store, and multiply-add helpers were among the busiest named symbols. The stock JIT reached `1.000` median speed on that replay. The full C module reached `0.420` in an uninstrumented repeat and `0.413` with the sampler attached. Runtime profiles, binaries, and instruction addresses stayed local.
+
+A private trial replaced the module's CRT fused multiply-add call with a hardware FMA instruction on the i5-11400. Two runs per build in alternating order measured `0.423` and `0.421` for the reference and `0.419` and `0.406` for the trial, with 33 samples per run and clean exits. Keep the existing floating-point path. The profile points to several hot helpers and large generated chunks. Evaluate code layout and register-state traffic before tuning individual floating-point calls further.
+
 GekkoAOT already compiles secondary modules and translates between compile-time and live addresses. Its standalone ABI is different from the current runtime's. The local DOL passed its ABI probe. REL linking and gameplay are still unverified in that tool.
+
+### Experimental LLVM backend on Windows
+
+Replaying the early gameplay checkpoint with the earlier LLVM boot module reproduced `0xC0000409` on shutdown. The debugger traced the abort to the CPU manager joining its play-time tracking thread. The LLVM build changed `XMM7` across the CPU run loop, and the caller had kept the thread handle in that register. The C reference preserved the register and shut down normally. The ABI requires functions to restore `XMM7` before returning. [Windows x64 calling convention](https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention#callercallee-saved-registers)
+
+The Windows RecompCore LLVM path now returns through generated function frames so they restore the caller's registers. The rebuilt module preserved `XMM7` and shut down normally in the same debugger replay. The build also supplies the SDK's native-region check, which permits native chaining when no host-call hook is installed.
+
+The module linked against the SDK from a fresh runtime staging run. On the same runner without the debugger, the early gameplay checkpoint measured `0.718` median speed with C and `0.486` with the experimental LLVM boot module. The later cutscene reached `0.727` median speed with LLVM. Each headless replay completed 29 samples and shut down normally. The LLVM gameplay run logged more than nine million native dispatches. The regular launcher selects the C build.
 
 Once normal-speed play is reliable, compare the original rendering cadence with a render loop that runs independently of the original simulation tick. Keep movie cadence and audio timing intact. NVIDIA's [Streamline integration guide](https://developer.nvidia.com/rtx/streamline/get-started) describes the timing markers for Reflex and the scene data needed for DLSS reconstruction. Revisit GPU features after those inputs can be measured and validated.
