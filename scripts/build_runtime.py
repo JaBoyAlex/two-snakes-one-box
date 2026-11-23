@@ -9,12 +9,15 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def apply_patch(source, name):
+def apply_patch(source, name, *, after=()):
     patch = ROOT / 'patches' / name
     command = ['git', '-C', str(source), 'apply']
-    if subprocess.run([*command, '--reverse', '--check', str(patch)], capture_output=True).returncode:
-        subprocess.run([*command, '--check', str(patch)], check=True)
-        subprocess.run([*command, str(patch)], check=True)
+    if not subprocess.run([*command, '--reverse', '--check', str(patch)], capture_output=True).returncode:
+        return
+    for prerequisite in after:
+        apply_patch(source, prerequisite)
+    subprocess.run([*command, '--check', str(patch)], check=True)
+    subprocess.run([*command, str(patch)], check=True)
 
 
 def main():
@@ -32,7 +35,8 @@ def main():
             raise SystemExit(f'Source revision does not match dependencies.lock.json: {directory.name}')
     apply_patch(source, 'moderngekko-auto-gamepad.patch')
     apply_patch(source, 'moderngekko-no-empty-mod-hooks.patch')
-    apply_patch(source / 'vendor/dolphin', 'recompcore-auto-gamepad.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch',
+                after=('recompcore-auto-gamepad.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-twin-snakes-idle.patch')
     subprocess.run(['cmake', '-S', str(source), '-B', str(build), '-G', 'Ninja',
                     '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_TESTING=OFF',

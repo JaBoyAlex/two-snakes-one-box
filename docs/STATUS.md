@@ -10,7 +10,7 @@ The Windows prototype reaches the title screen with a native boot module. The US
 | Native game module | Local setup extracted both RVZ discs and built one shared native boot module. The main game REL was translated in a separate experiment, with runtime integration outstanding. |
 | Boot / gameplay | Disc 1 reached the main menu at about 60 FPS with the idle fix. Disc 2 advanced at normal speed in a headless boot test. Gameplay and the disc transition still need verification. |
 | Audio / cutscenes / codec | The updated main menu had clear audio. Frame drops and audio stutter still occur during a cutscene. Codec conversations and gameplay audio still need verification. |
-| Controller | Rebuilt runtime detected an XInput controller and assigned it to port 1 without a config file. In-game response and reconnection still need verification. |
+| Controller | The initial SDL mapping detected the controller but discarded presses because INI values were converted to booleans. The fixed Windows runtime automatically mapped a physical XInput controller to port 1 with a fresh profile. The trace captured Start, A, B and D-pad presses, and the tester confirmed an in-game response. Reconnect and other controller types still need hardware testing. |
 | Save / load / disc transition | Not tested |
 | Complete playthrough | Not tested |
 | RecompLauncher schema | Passes the official current schema; separate disc inputs and prepare/start entry points. |

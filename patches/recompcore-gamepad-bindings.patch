@@ -1,0 +1,111 @@
+diff --git a/Source/Core/Core/HW/GCPad.cpp b/Source/Core/Core/HW/GCPad.cpp
+index c4a263b4dc..f60f10e1d6 100644
+--- a/Source/Core/Core/HW/GCPad.cpp
++++ b/Source/Core/Core/HW/GCPad.cpp
+@@ -5,6 +5,8 @@
+ 
+ #include <algorithm>
+ #include <cstdio>
++#include <string>
++#include <utility>
+ 
+ #include "Common/Common.h"
+ #include "Common/FileUtil.h"
+@@ -54,31 +56,35 @@ static void UpdateDefaultGamepad()
+ 
+   Common::IniFile::Section mapping;
+   mapping.Set("Device", (*device)->GetQualifiedName());
+-  mapping.Set("Buttons/A", "`Button S`");
+-  mapping.Set("Buttons/B", "`Button E`");
+-  mapping.Set("Buttons/X", "`Button W`");
+-  mapping.Set("Buttons/Y", "`Button N`");
+-  mapping.Set("Buttons/Z", "`Shoulder R`");
+-  mapping.Set("Buttons/Start", "Start");
+-  mapping.Set("Main Stick/Up", "`Left Y+`");
+-  mapping.Set("Main Stick/Down", "`Left Y-`");
+-  mapping.Set("Main Stick/Left", "`Left X-`");
+-  mapping.Set("Main Stick/Right", "`Left X+`");
+-  mapping.Set("Main Stick/Calibration", "100.00");
+-  mapping.Set("C-Stick/Up", "`Right Y+`");
+-  mapping.Set("C-Stick/Down", "`Right Y-`");
+-  mapping.Set("C-Stick/Left", "`Right X-`");
+-  mapping.Set("C-Stick/Right", "`Right X+`");
+-  mapping.Set("C-Stick/Calibration", "100.00");
+-  mapping.Set("Triggers/L", "`Trigger L` > 0.9");
+-  mapping.Set("Triggers/R", "`Trigger R` > 0.9");
+-  mapping.Set("Triggers/L-Analog", "`Trigger L`");
+-  mapping.Set("Triggers/R-Analog", "`Trigger R`");
+-  mapping.Set("D-Pad/Up", "`Pad N`");
+-  mapping.Set("D-Pad/Down", "`Pad S`");
+-  mapping.Set("D-Pad/Left", "`Pad W`");
+-  mapping.Set("D-Pad/Right", "`Pad E`");
+-  mapping.Set("Rumble/Motor", "`Motor L` | `Motor R`");
++  // INI's numeric overload treats a C string as a boolean.
++  const auto bind = [&mapping](const char* control, std::string expression) {
++    mapping.Set(control, std::move(expression));
++  };
++  bind("Buttons/A", "`Button S`");
++  bind("Buttons/B", "`Button E`");
++  bind("Buttons/X", "`Button W`");
++  bind("Buttons/Y", "`Button N`");
++  bind("Buttons/Z", "`Shoulder R`");
++  bind("Buttons/Start", "Start");
++  bind("Main Stick/Up", "`Left Y+`");
++  bind("Main Stick/Down", "`Left Y-`");
++  bind("Main Stick/Left", "`Left X-`");
++  bind("Main Stick/Right", "`Left X+`");
++  bind("Main Stick/Calibration", "100.00");
++  bind("C-Stick/Up", "`Right Y+`");
++  bind("C-Stick/Down", "`Right Y-`");
++  bind("C-Stick/Left", "`Right X-`");
++  bind("C-Stick/Right", "`Right X+`");
++  bind("C-Stick/Calibration", "100.00");
++  bind("Triggers/L", "`Trigger L` > 0.9");
++  bind("Triggers/R", "`Trigger R` > 0.9");
++  bind("Triggers/L-Analog", "`Trigger L`");
++  bind("Triggers/R-Analog", "`Trigger R`");
++  bind("D-Pad/Up", "`Pad N`");
++  bind("D-Pad/Down", "`Pad S`");
++  bind("D-Pad/Left", "`Pad W`");
++  bind("D-Pad/Right", "`Pad E`");
++  bind("Rumble/Motor", "Motor");
+   pad->LoadConfig(&mapping);
+   pad->UpdateReferences(g_controller_interface);
+   std::fprintf(stderr, "[input] Port 1: %s\n", (*device)->GetQualifiedName().c_str());
+diff --git a/Source/Core/DolphinNoGUI/Platform.h b/Source/Core/DolphinNoGUI/Platform.h
+index 5b0729a9eb..0bab92f594 100644
+--- a/Source/Core/DolphinNoGUI/Platform.h
++++ b/Source/Core/DolphinNoGUI/Platform.h
+@@ -15,7 +15,7 @@ public:
+   virtual ~Platform();
+ 
+   bool IsRunning() const { return m_running.IsSet(); }
+-  bool IsWindowFocused() const { return m_window_focus; }
++  virtual bool IsWindowFocused() const { return m_window_focus; }
+   bool IsWindowFullscreen() const { return m_window_fullscreen; }
+ 
+   virtual bool Init();
+diff --git a/Source/Core/DolphinNoGUI/PlatformWin32.cpp b/Source/Core/DolphinNoGUI/PlatformWin32.cpp
+index 3402fdae95..f72d1c5a64 100644
+--- a/Source/Core/DolphinNoGUI/PlatformWin32.cpp
++++ b/Source/Core/DolphinNoGUI/PlatformWin32.cpp
+@@ -49,6 +49,7 @@ public:
+   ~PlatformWin32() override;
+ 
+   bool Init() override;
++  bool IsWindowFocused() const override;
+   void SetTitle(const std::string& string) override;
+   void MainLoop() override;
+ 
+@@ -278,6 +279,11 @@ bool PlatformWin32::Init()
+   return true;
+ }
+ 
++bool PlatformWin32::IsWindowFocused() const
++{
++  return m_hwnd && GetForegroundWindow() == m_hwnd;
++}
++
+ void PlatformWin32::SetTitle(const std::string& string)
+ {
+   SetWindowTextW(m_hwnd, UTF8ToWString(string).c_str());

@@ -23,6 +23,7 @@
   "patches/moderngekko-auto-gamepad.patch",
   "patches/moderngekko-no-empty-mod-hooks.patch",
   "patches/recompcore-auto-gamepad.patch",
+  "patches/recompcore-gamepad-bindings.patch",
   "patches/recompcore-twin-snakes-idle.patch",
   "docs/BUILDING.md",
   "docs/ROADMAP.md",

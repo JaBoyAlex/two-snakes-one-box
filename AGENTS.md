@@ -1,4 +1,4 @@
-# Twin Snakes Recomp development
+# Two Snakes, One Box development
 
 - The user's objective is a stable native recomp with easy RecompLauncher installation, followed by monitor-native output and a validated unlocked-framerate mode.
 - Keep retail disc data, extracted assets, saves, generated game code, game modules and raw diagnostic logs private in ignored storage. Publish source/tooling only.

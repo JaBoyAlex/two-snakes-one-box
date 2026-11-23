@@ -1,8 +1,8 @@
 {
   "$schema": "https://recomplauncher.com/schema/recomplauncher.json",
   "format": 1,
-  "name": "Twin Snakes Recomp (Development)",
-  "repo": "JaBoyAlex/twin-snakes-recomp",
+  "name": "Two Snakes, One Box (Development)",
+  "repo": "JaBoyAlex/two-snakes-one-box",
   "inputs": [
     {
       "id": "disc1",

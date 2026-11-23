@@ -1,4 +1,4 @@
-# Twin Snakes Recomp
+# Two Snakes, One Box
 
 A work-in-progress native recompilation project for **Metal Gear Solid: The Twin Snakes** on GameCube, with local-disc setup and RecompLauncher integration.
 
@@ -27,7 +27,7 @@ This is a recompilation with a hardware compatibility runtime. Native code gener
 
 See [BUILDING.md](docs/BUILDING.md) for the source workflow, [STATUS.md](docs/STATUS.md) for measured results and [ROADMAP.md](docs/ROADMAP.md) for release gates.
 
-The Windows prototype automatically maps the first recognized SDL gamepad to port 1 when there is no custom GameCube controller profile. There is a keyboard fallback. Physical play and reconnect still need verification.
+Standalone and RecompLauncher launches use the same controller setup. The Windows runtime automatically maps the first recognized SDL gamepad to port 1, uses a saved GameCube controller profile if one exists, and falls back to the keyboard when no gamepad is available. Physical XInput button presses have been verified in the game. Reconnect and other controller types still need hardware testing.
 
 Windows x64 is the first target. Linux and macOS packaging will follow verified builds on those platforms.
 
