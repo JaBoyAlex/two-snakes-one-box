@@ -250,6 +250,7 @@
     "21": "Setup dependency or filesystem error. See the local logs and development requirements.",
     "22": "Native compilation failed. See the local build log.",
     "24": "Twin Snakes is already running, or this installation is busy with setup.",
-    "25": "The game runtime stopped with an error. This is a development build."
+    "25": "The game runtime stopped with an error. This is a development build.",
+    "27": "The local build is missing or damaged. Close this message and press Play again to reopen Easy Setup. Your saves and settings are kept."
   }
 }

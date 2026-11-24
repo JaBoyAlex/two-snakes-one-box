@@ -183,8 +183,12 @@ class PrepareTests(unittest.TestCase):
     def test_visible_play_rejects_a_second_install_and_releases_the_lock(self):
         first = self.root / 'first'
         second = self.root / 'second'
-        entry = {'root': 'disc1', 'module': 'disc1.dll'}
+        entry = {'root': 'disc1', 'dol': 'disc1/sys/main.dol', 'module': 'disc1.dll',
+                 'metadata': {'dol_sha256': self.disc.dol_sha256}}
         for data in (first, second):
+            self.write_extraction(data / 'disc1')
+            (data / entry['module']).write_bytes(b'linked output')
+            (data / 'link.complete').touch()
             twin_snakes.atomic_json(data / 'prepared.json', {'discs': [entry]})
         args = SimpleNamespace(boot_disc=1, allow_interpreter=False, headless=False,
                                automation_dir=None)
@@ -201,6 +205,33 @@ class PrepareTests(unittest.TestCase):
             with patch.object(twin_snakes, 'run') as run:
                 twin_snakes.play(args, self.root, second, None)
                 run.assert_called_once()
+
+    def test_play_offers_setup_again_after_cache_damage(self):
+        entries = []
+        for number in (1, 2):
+            self.write_extraction(self.root / f'disc{number}')
+            entries.append({'root': f'disc{number}', 'dol': f'disc{number}/sys/main.dol',
+                            'module': 'shared.dll', 'metadata': {'dol_sha256': self.disc.dol_sha256}})
+        module = self.root / 'shared.dll'
+        good_module = b'linked output'
+        module.write_bytes(good_module)
+        twin_snakes.atomic_json(self.root / 'link.complete', twin_snakes.digest(module))
+        active = self.root / 'prepared.json'
+        args = SimpleNamespace(boot_disc=1, allow_interpreter=False, headless=True, automation_dir=None)
+        for damaged, original, modified in [(self.root / entries[1]['dol'], b'test DOL', b'bad! DOL'),
+                                            (module, good_module, b'broken bytes!')]:
+            with self.subTest(file=damaged.name):
+                twin_snakes.atomic_json(active, {'discs': entries})
+                original_record = active.read_bytes()
+                damaged.write_bytes(modified)
+                with patch.object(twin_snakes, 'run') as run:
+                    with self.assertRaisesRegex(twin_snakes.SetupError, 'Run setup again') as error:
+                        twin_snakes.play(args, self.root, self.root, None)
+                    self.assertEqual(error.exception.code, 27)
+                    run.assert_not_called()
+                self.assertFalse(active.exists())
+                self.assertEqual((self.root / 'prepared.needs-repair.json').read_bytes(), original_record)
+                damaged.write_bytes(original)
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 
 A work-in-progress native recompilation project for **Metal Gear Solid: The Twin Snakes** on GameCube, with local-disc setup and RecompLauncher integration.
 
-**Development status.** The Windows dev.20 package prepares and boots both USA discs with a locally compiled native module and uses JIT fallback for the main gameplay module. In-app RecompLauncher setup and Play were verified on dev.19. Tower A reached 100% median game speed in sustained replays, with intermittent pacing dips. A complete playthrough remains a release gate.
+**Development status.** The Windows dev.20 package prepares and boots both USA discs with a locally compiled native module and uses JIT fallback for the main gameplay module. RecompLauncher beta 68 imported dev.20 into a fresh portable profile, prepared both discs through Easy Setup and launched the game. Tower A reached 100% median game speed in sustained replays, with intermittent pacing dips. A complete playthrough remains a release gate.
 
 Players will provide both **USA revision 0** discs matching `supported-builds.json`. Commercial game data and generated game code are never included in this repository or release downloads.
 
@@ -15,7 +15,7 @@ Players will provide both **USA revision 0** discs matching `supported-builds.js
 3. Setup validates the disc pair and recompiles the game locally.
 4. Press Play. The same `TwinSnakes.exe` handles setup and playing; settings, builds and saves live in one movable data folder.
 
-Local RecompLauncher development builds use the developer-mode import. Catalog availability follows the release gates.
+To import a local build in RecompLauncher beta 68, open Settings and choose **Bring Your Games**, **Pick a Folder**, **Go Through Them**, then **Add Without Updates**. Catalog availability follows the release gates.
 
 ## Approach
 

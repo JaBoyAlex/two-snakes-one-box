@@ -32,6 +32,10 @@ def digest(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
+def file_matches(path, expected):
+    return path.is_file() and digest(path) == expected
+
+
 def atomic_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + '.tmp')
@@ -186,11 +190,11 @@ def compiler_environment(runtime):
 
 def verify_extraction(extracted, disc, rel_layout):
     dol = extracted / 'sys/main.dol'
-    if not dol.is_file() or digest(dol) != disc.dol_sha256:
+    if not file_matches(dol, disc.dol_sha256):
         raise DiscError('Extracted executable does not match the selected disc.')
     if rel_layout:
         rel = extracted / rel_layout['path']
-        if not rel.is_file() or digest(rel) != rel_layout['sha256']:
+        if not file_matches(rel, rel_layout['sha256']):
             raise DiscError('Extracted game module does not match the verified revision.')
 
 
@@ -224,13 +228,17 @@ def extract_disc(iso, disc, build, runtime, log, rel_layout):
     return extracted
 
 
-def native_module_ready(module):
+def native_module_ready(module, *, allow_legacy=False):
+    if not module.is_file() or module.stat().st_size == 0:
+        return False
     try:
-        expected = json.loads(module.with_name('link.complete').read_text(encoding='utf-8'))
+        marker = module.with_name('link.complete').read_text(encoding='utf-8')
+        if allow_legacy and not marker:
+            return True
+        expected = json.loads(marker)
     except (FileNotFoundError, ValueError):
         return False
-    return (isinstance(expected, str) and module.is_file() and module.stat().st_size > 0
-            and digest(module) == expected)
+    return isinstance(expected, str) and digest(module) == expected
 
 
 def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layout=None):
@@ -351,7 +359,17 @@ def play(args, runtime, data, log):
     if not prepared.is_file():
         raise DiscError('Setup is required. Select both discs with --prepare first.')
     record = json.loads(prepared.read_text(encoding='utf-8'))
-    entry = record['discs'][args.boot_disc - 1]
+    discs = record['discs']
+    entry = discs[args.boot_disc - 1]
+    # Check both boot files before advertising an alternate disc to the runtime.
+    boot_files_ready = all(file_matches(data / disc['dol'], disc['metadata']['dol_sha256'])
+                           for disc in discs)
+    modules_ready = args.allow_interpreter or all(native_module_ready(module, allow_legacy=True)
+                                                  for module in {data / disc['module'] for disc in discs})
+    if not (boot_files_ready and modules_ready):
+        # RecompLauncher uses this file to decide whether Play should reopen Easy Setup.
+        prepared.replace(data / 'prepared.needs-repair.json')
+        raise SetupError('Cached Twin Snakes files are missing or damaged. Run setup again to repair them.', 27)
     user = data / 'user'
     user.mkdir(exist_ok=True)
     config = user / 'config.ini'
@@ -369,10 +387,8 @@ def play(args, runtime, data, log):
         command += ['--automation-dir', args.automation_dir.resolve()]
     env = os.environ.copy()
     env.pop('MODERNGEKKO_ALTERNATE_DISC', None)
-    if len(record['discs']) == 2:
-        alternate = data / record['discs'][2 - args.boot_disc]['dol']
-        if alternate.is_file():
-            env['MODERNGEKKO_ALTERNATE_DISC'] = str(alternate)
+    if len(discs) == 2:
+        env['MODERNGEKKO_ALTERNATE_DISC'] = str(data / discs[2 - args.boot_disc]['dol'])
     # Distinct package folders have distinct data locks and can share this desktop.
     player_lock = nullcontext() if args.headless else file_lock(
         user_data_directory() / 'player.lock', 'Twin Snakes is already running.')
