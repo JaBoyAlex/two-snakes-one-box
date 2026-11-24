@@ -1,0 +1,29 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -258,5 +258,12 @@ endif()
+ add_executable(dolrecomp src/app/main.c)
+ target_link_libraries(dolrecomp PRIVATE dr_app)
++if(MSVC)
++    # Use UTF-8 for narrow command-line arguments and filesystem paths.
++    set(dolrecomp_manifest "${CMAKE_CURRENT_SOURCE_DIR}/src/app/dolrecomp.manifest")
++    target_link_options(dolrecomp PRIVATE /MANIFEST:EMBED
++        "/MANIFESTINPUT:${dolrecomp_manifest}")
++    set_property(TARGET dolrecomp APPEND PROPERTY LINK_DEPENDS "${dolrecomp_manifest}")
++endif()
+ if(DOLRECOMP_ENABLE_LLVM)
+     set_property(TARGET dolrecomp PROPERTY LINKER_LANGUAGE CXX)
+     # Large LLVM modules exceed MSVC's default 1 MiB stack.
+diff --git a/src/app/dolrecomp.manifest b/src/app/dolrecomp.manifest
+new file mode 100644
+--- /dev/null
++++ b/src/app/dolrecomp.manifest
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
++<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
++    <application xmlns="urn:schemas-microsoft-com:asm.v3">
++        <windowsSettings>
++            <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
++        </windowsSettings>
++    </application>
++</assembly>

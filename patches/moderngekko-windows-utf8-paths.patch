@@ -1,0 +1,30 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -420,6 +420,13 @@ if(MODERNGEKKO_FRONTEND_SDK OR MODERNGEKKO_BUILD_FRONTEND)
+         tools/dol_patch.cpp
+         vendor/dolphin/Externals/imgui/imgui/backends/imgui_impl_sdl3.cpp
+         vendor/dolphin/Externals/imgui/imgui/backends/imgui_impl_sdlrenderer3.cpp)
++    if(MSVC)
++        # Keep narrow arguments compatible with the runtime's UTF-8 paths.
++        set(runner_manifest "${CMAKE_CURRENT_SOURCE_DIR}/tools/moderngekko-run.manifest")
++        target_link_options(moderngekko-run PRIVATE /MANIFEST:EMBED
++            "/MANIFESTINPUT:${runner_manifest}")
++        set_property(TARGET moderngekko-run APPEND PROPERTY LINK_DEPENDS "${runner_manifest}")
++    endif()
+     target_include_directories(moderngekko-run PRIVATE
+         "${CMAKE_CURRENT_SOURCE_DIR}/tools"
+         "${CMAKE_CURRENT_SOURCE_DIR}/src"
+diff --git a/tools/moderngekko-run.manifest b/tools/moderngekko-run.manifest
+new file mode 100644
+--- /dev/null
++++ b/tools/moderngekko-run.manifest
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
++<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
++    <application xmlns="urn:schemas-microsoft-com:asm.v3">
++        <windowsSettings>
++            <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
++        </windowsSettings>
++    </application>
++</assembly>

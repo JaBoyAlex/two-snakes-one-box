@@ -38,6 +38,7 @@ def main():
     apply_patch(source, 'moderngekko-disc-pair.patch')
     apply_patch(source, 'moderngekko-automatic-display.patch')
     apply_patch(source, 'moderngekko-title-game-speed.patch')
+    apply_patch(source, 'moderngekko-windows-utf8-paths.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch',
                 after=('recompcore-auto-gamepad.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-empty-gamepad-config.patch')
@@ -51,6 +52,7 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-twin-snakes-idle.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-llvm-region-check.patch')
     apply_patch(source / 'vendor/dolphin/DolRecomp', 'dolrecomp-win64-llvm-returns.patch')
+    apply_patch(source / 'vendor/dolphin/DolRecomp', 'dolrecomp-windows-utf8-paths.patch')
     subprocess.run(['cmake', '-S', str(source), '-B', str(build), '-G', 'Ninja',
                     '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_TESTING=OFF',
                     f'-DPython3_EXECUTABLE={os.sys.executable}',
