@@ -215,7 +215,7 @@
     "20": "Missing, unsupported or mismatched discs. Choose Twin Snakes Disc 1 and Disc 2 from the same region and revision.",
     "21": "Setup dependency or filesystem error. See the local logs and development requirements.",
     "22": "Native compilation failed. See the local build log.",
-    "24": "This installation is already building or running.",
+    "24": "Twin Snakes is already running, or this installation is busy with setup.",
     "25": "The game runtime stopped with an error. This is a development build."
   }
 }

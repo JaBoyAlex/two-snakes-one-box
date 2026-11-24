@@ -1,6 +1,6 @@
 """Local-disc setup and stable entry point for Twin Snakes Recomp."""
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import hashlib
 import json
 import os
@@ -39,16 +39,20 @@ def atomic_json(path, value):
     temporary.replace(path)
 
 
-def default_data():
-    if os.environ.get('RECOMPLAUNCHER_DATA'):
-        return Path(os.environ['RECOMPLAUNCHER_DATA'])
-    if (ROOT / 'portable.txt').exists():
-        return ROOT / 'recompdata'
+def user_data_directory():
     if os.name == 'nt':
         return Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData/Local')) / 'TwinSnakesRecomp'
     if sys.platform == 'darwin':
         return Path.home() / 'Library/Application Support/TwinSnakesRecomp'
     return Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share')) / 'TwinSnakesRecomp'
+
+
+def default_data():
+    if os.environ.get('RECOMPLAUNCHER_DATA'):
+        return Path(os.environ['RECOMPLAUNCHER_DATA'])
+    if (ROOT / 'portable.txt').exists():
+        return ROOT / 'recompdata'
+    return user_data_directory()
 
 
 def progress(fraction, message):
@@ -87,12 +91,9 @@ def pick_disc(number):
 
 
 @contextmanager
-def installation_lock(data):
-    data.mkdir(parents=True, exist_ok=True)
-    with (data / 'session.lock').open('a+b') as stream:
-        stream.seek(0)
-        stream.write(b'0')
-        stream.flush()
+def file_lock(path, busy_message):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('a+b') as stream:
         stream.seek(0)
         try:
             if os.name == 'nt':
@@ -102,7 +103,7 @@ def installation_lock(data):
                 import fcntl
                 fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
-            raise SetupError('This installation is already building or running.', 24) from exc
+            raise SetupError(busy_message, 24) from exc
         try:
             yield
         finally:
@@ -342,7 +343,11 @@ def play(args, runtime, data, log):
         alternate = data / record['discs'][2 - args.boot_disc]['dol']
         if alternate.is_file():
             env['MODERNGEKKO_ALTERNATE_DISC'] = str(alternate)
-    run(command, log, code=25, env=env)
+    # Distinct package folders have distinct data locks and can share this desktop.
+    player_lock = nullcontext() if args.headless else file_lock(
+        user_data_directory() / 'player.lock', 'Twin Snakes is already running.')
+    with player_lock:
+        run(command, log, code=25, env=env)
 
 
 def main():
@@ -366,7 +371,7 @@ def main():
     data = (args.data or default_data()).resolve()
     runtime = (args.runtime or (ROOT / 'runtime' if (ROOT / 'runtime').is_dir() else ROOT / '.local/runtime')).resolve()
     try:
-        with installation_lock(data):
+        with file_lock(data / 'session.lock', 'This installation is already building or running.'):
             logs = data / 'logs'
             logs.mkdir(exist_ok=True)
             for old in sorted(logs.glob('session-*.log'))[:-4]:

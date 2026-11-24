@@ -112,6 +112,10 @@ Each separate-thread run logged one render interval exceeding 40 ms at about the
 
 The matched JIT reference also logged a 502 ms render interval while maintaining 99.3% or better game speed. An isolated hybrid replay with duplicate framebuffer presentation enabled recorded 1,801 presents for 1,801 vertical blanks, and its longest render interval was 26.59 ms. The default separate-thread run recorded 1,773 presents for 1,802 vertical blanks. The half-second gap came from the renderer skipping identical framebuffers. Leave that optimization enabled so the runtime sends new frames as the game produces them.
 
+On a saved dialogue scene, headless hybrid and JIT replays produced exactly the same 907,088 overlapping DSP stereo sample frames, spanning 28.322 seconds. The replays used the original guest clock and captured audio before it reached the Windows output backend. The hybrid sampled speed reached a low of 92.4% while the PC was in use during testing.
+
+A separate Windows process loopback capture measured 9.99 seconds of output from the running hybrid build and 24.99 seconds from the JIT dialogue reference. Both captures reported zero packet discontinuities and zero timestamp gaps larger than 2 ms. These were different scenes. A matched hybrid output capture at the reported stutter point is still needed to test the mixer and playback path under load. [Windows application loopback capture](https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/applicationloopbackaudio-sample/)
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.

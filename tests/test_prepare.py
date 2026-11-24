@@ -90,6 +90,28 @@ class PrepareTests(unittest.TestCase):
             self.assertEqual(twin_snakes.build_disc(*args)[1], module)
         self.assertEqual(attempts, 2)
 
+    def test_visible_play_rejects_a_second_install_and_releases_the_lock(self):
+        first = self.root / 'first'
+        second = self.root / 'second'
+        entry = {'root': 'disc1', 'module': 'disc1.dll'}
+        for data in (first, second):
+            twin_snakes.atomic_json(data / 'prepared.json', {'discs': [entry]})
+        args = SimpleNamespace(boot_disc=1, allow_interpreter=False, headless=False,
+                               automation_dir=None)
+
+        def try_second_launch(*_args, **_kwargs):
+            with self.assertRaisesRegex(twin_snakes.SetupError, 'already running') as busy:
+                twin_snakes.play(args, self.root, second, None)
+            self.assertEqual(busy.exception.code, 24)
+
+        with patch.object(twin_snakes, 'user_data_directory', return_value=self.root / 'profile'):
+            with patch.object(twin_snakes, 'run', side_effect=try_second_launch) as run:
+                twin_snakes.play(args, self.root, first, None)
+                run.assert_called_once()
+            with patch.object(twin_snakes, 'run') as run:
+                twin_snakes.play(args, self.root, second, None)
+                run.assert_called_once()
+
 
 if __name__ == '__main__':
     unittest.main()
