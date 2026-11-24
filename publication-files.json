@@ -25,6 +25,7 @@
   "patches/dolrecomp-windows-utf8-paths.patch",
   "patches/moderngekko-auto-gamepad.patch",
   "patches/moderngekko-automatic-display.patch",
+  "patches/moderngekko-create-shader-cache.patch",
   "patches/moderngekko-disc-pair.patch",
   "patches/moderngekko-no-empty-mod-hooks.patch",
   "patches/moderngekko-title-game-speed.patch",

@@ -231,6 +231,24 @@ The candidate registered fewer samples below 95% in both comparisons. Its lowest
 
 A round-trip test preserved all 65,536 test lane values, including NaN payloads and signed zeros. Headless Tower A trace and DSP captures varied between trials. The first candidate dump differed after 4.371 seconds of DSP audio, and two runs of the dev.16 reference also had different native traces. A repeated candidate run matched all 273 comparable dispatch records from the first dev.16 run, including the guest timebase and downcount. Its 22.333 seconds of overlapping DSP audio also matched sample for sample.
 
+### Shader cache and isolated hitches
+
+Standalone startup set the user path and enabled shader caching. A fresh profile lacked the parent cache directory. The Vulkan renderer tried to create the shader subdirectory with a single-directory operation, and the pipeline UID cache could not open its file in the missing parent. Startup now creates the full shader cache path before initializing the renderer.
+
+The regular runner created six Vulkan cache files and a pipeline UID cache on a fresh profile. A second launch using the same directory read 34 saved pipeline UIDs. Both launches shut down normally.
+
+Three 90-second, shared-thread Tower A diagnostic runs used the same instrumented dev.17 build, 4× Vulkan and normal audio. The first used an untouched profile. The second started with an empty cache directory and wrote about 11.6 MB of cache files. The third seeded a fresh profile with those files.
+
+| Shader cache | Median game speed | Speed p05 | VBlank interval p95 | Longest VBlank interval | VBlank intervals over 50 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Missing directory | 100.0% | 92.0% | 18.76 ms | 55.63 ms | 1 |
+| Empty writable cache | 95.9% | 83.5% | 21.85 ms | 90.10 ms | 5 |
+| Populated cache | 100.0% | 90.4% | 19.39 ms | 73.66 ms | 1 |
+
+The populated cache had fewer long intervals than the empty cache in this pair. The missing-directory run also had one long interval. These runs establish the persistence bug and show run-to-run variation in the remaining hitches.
+
+During the warm run's 73.66 ms VBlank gap, presentation ran for 55.6 ms and the same thread spent 55.4 ms inside a Vulkan fence wait. The traced shader compile and native cache-reset events occurred outside that gap. A separate diagnostic run sampled the emulation thread in Windows' Ready state inside two gaps of about 40 ms. The snapshots identify periods when the thread was runnable and cannot measure the full time it spent waiting to run. Identify the work behind the Vulkan fence and keep checking scheduling gaps under normal playback.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.

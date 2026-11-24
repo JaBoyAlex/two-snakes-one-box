@@ -1,0 +1,19 @@
+diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
+--- a/src/runtime/dolphin_runtime.cpp
++++ b/src/runtime/dolphin_runtime.cpp
+@@ -2,6 +2,7 @@
+ 
+ #include "AudioCommon/AudioCommon.h"
+ #include "Common/Config/Config.h"
++#include "Common/FileUtil.h"
+ #include "Common/HookableEvent.h"
+ #include "Common/StringUtil.h"
+ #include "Core/Boot/Boot.h"
+@@ -620,6 +621,7 @@
+ 
+   if (!s_external_ui_common) {
+     UICommon::SetUserDirectory(impl->config.user_directory.string());
++    File::CreateFullPath(File::GetUserPath(D_SHADERCACHE_IDX));
+     UICommon::Init();
+     impl->ui_initialized = true;
+   }

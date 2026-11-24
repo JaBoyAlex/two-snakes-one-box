@@ -39,6 +39,7 @@ def main():
     apply_patch(source, 'moderngekko-automatic-display.patch')
     apply_patch(source, 'moderngekko-title-game-speed.patch')
     apply_patch(source, 'moderngekko-windows-utf8-paths.patch')
+    apply_patch(source, 'moderngekko-create-shader-cache.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch',
                 after=('recompcore-auto-gamepad.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-empty-gamepad-config.patch')
