@@ -98,6 +98,20 @@ At the new F1 checkpoint, the display runner reached 79.7% median speed with gra
 
 The rebuilt runner exited normally in each replay and in a cold Disc 1 boot at 100% median speed. The 1× run still had a 137 ms render interval. These brief runs identify a CPU improvement. Repeat across longer replays before drawing conclusions about scale or worst-case pacing.
 
+A 25-second replay of the same checkpoint with graphics and audio disabled measured 99.9% median game speed and a 90.3% minimum for the linked hybrid runtime. The JIT reference measured 100.0% median speed with a 99.9% minimum. Each mode completed 101 samples.
+
+The linked runtime also replayed the checkpoint in fullscreen Vulkan with audio enabled for 30 seconds per configuration. Each run completed 120 or 121 game-speed samples and shut down normally.
+
+| CPU and video threads | Internal scale | Median game speed | Lowest sampled speed | 95th-percentile render interval | Longest render interval |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Separate | 1× | 99.9% | 94.5% | 18.09 ms | 491.75 ms |
+| Separate | 4× | 99.9% | 95.7% | 18.29 ms | 489.18 ms |
+| Shared | 4× | 99.9% | 70.3% | 20.30 ms | 425.75 ms |
+
+Each separate-thread run logged one render interval exceeding 40 ms at about the same time. Vertical blank intervals continued and peaked at about 30 ms. The gap appears at both tested scales. The separate-thread profile improves the sampled speed floor in this scene. Compatibility in later scenes and audio under load still need testing before changing the default.
+
+The matched JIT reference also logged a 502 ms render interval while maintaining 99.3% or better game speed. An isolated hybrid replay with duplicate framebuffer presentation enabled recorded 1,801 presents for 1,801 vertical blanks, and its longest render interval was 26.59 ms. The default separate-thread run recorded 1,773 presents for 1,802 vertical blanks. The half-second gap came from the renderer skipping identical framebuffers. Leave that optimization enabled so the runtime sends new frames as the game produces them.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.

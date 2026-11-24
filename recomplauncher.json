@@ -23,14 +23,7 @@
         "ids": [
           "GGSEA4"
         ]
-      },
-      "dumps": [
-        {
-          "name": "USA revision 0 Disc 1 (normalized ISO, project reference)",
-          "size": 1459978240,
-          "crc32": "02ab12f2"
-        }
-      ]
+      }
     },
     {
       "id": "disc2",
@@ -51,14 +44,7 @@
         "ids": [
           "GGSEA4"
         ]
-      },
-      "dumps": [
-        {
-          "name": "USA revision 0 Disc 2 (normalized ISO, project reference)",
-          "size": 1459978240,
-          "crc32": "ff7bcd0a"
-        }
-      ]
+      }
     }
   ],
   "prepare": {
@@ -99,7 +85,7 @@
         "resolution": "640x528",
         "backend": "Vulkan",
         "show_fps_in_title": "true",
-        "fullscreen": "false"
+        "fullscreen": "auto"
       }
     }
   ],
@@ -108,11 +94,17 @@
       "id": "display",
       "label": "Display",
       "group": "Video",
-      "help": "Borderless fullscreen uses the current monitor's desktop resolution.",
+      "help": "Automatic opens in fullscreen from Big Picture and in a window from the desktop. Borderless fullscreen uses the monitor's desktop resolution.",
       "defaults": {
-        "fullscreen": "false"
+        "fullscreen": "auto"
       },
       "choices": [
+        {
+          "label": "Automatic",
+          "set": {
+            "fullscreen": "auto"
+          }
+        },
         {
           "label": "Window",
           "set": {
@@ -131,7 +123,7 @@
       "id": "resolution",
       "label": "Internal resolution",
       "group": "Video",
-      "help": "Scales the GameCube render targets independently of the display resolution.",
+      "help": "Choose a fixed GameCube render scale or let it follow the window size in whole steps.",
       "defaults": {
         "resolution": "640x528"
       },
@@ -164,6 +156,12 @@
           "label": "6\u00d7",
           "set": {
             "resolution": "3840x2160"
+          }
+        },
+        {
+          "label": "Automatic integer scale",
+          "set": {
+            "resolution": "auto"
           }
         }
       ]

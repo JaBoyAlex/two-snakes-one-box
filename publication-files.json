@@ -23,6 +23,7 @@
   "scripts/package_windows.py",
   "patches/dolrecomp-win64-llvm-returns.patch",
   "patches/moderngekko-auto-gamepad.patch",
+  "patches/moderngekko-automatic-display.patch",
   "patches/moderngekko-disc-pair.patch",
   "patches/moderngekko-no-empty-mod-hooks.patch",
   "patches/moderngekko-title-game-speed.patch",

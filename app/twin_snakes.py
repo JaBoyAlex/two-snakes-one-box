@@ -325,9 +325,8 @@ def play(args, runtime, data, log):
     user.mkdir(exist_ok=True)
     config = user / 'config.ini'
     if not config.exists():
-        fullscreen = os.environ.get('RECOMPLAUNCHER_MODE') == 'bigpicture'
         config.write_text('resolution=640x528\nbackend=Vulkan\nshow_fps_in_title=true\n'
-                          f'fullscreen={str(fullscreen).lower()}\n', encoding='utf-8')
+                          'fullscreen=auto\n', encoding='utf-8')
     command = [tool(runtime, 'moderngekko-run'), '--game', data / entry['root'],
                '--module', data / entry['module'], '--user-dir', user,
                '--title', 'Twin Snakes Recomp']

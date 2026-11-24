@@ -1,0 +1,102 @@
+diff --git a/tools/frontend_config.cpp b/tools/frontend_config.cpp
+--- a/tools/frontend_config.cpp
++++ b/tools/frontend_config.cpp
+@@ -79,6 +79,7 @@
+   static const std::vector<ResolutionOption> resolutions = {
+       {"640x528", 1},   {"1280x720", 2},  {"1920x1080", 3},  {"2560x1440", 4},
+       {"3840x2160", 6}, {"5120x2880", 8}, {"7680x4320", 12},
++      {"auto", 0},
+   };
+   return resolutions;
+ }
+@@ -138,8 +139,14 @@
+       if (!ParseBoolean(value, &config.show_fps_in_title))
+         return {.error = "show_fps_in_title must be true or false"};
+     } else if (key == "fullscreen") {
+-      if (!ParseBoolean(value, &config.fullscreen))
+-        return {.error = "fullscreen must be true or false"};
++      if (value == "auto") {
++        config.fullscreen.reset();
++      } else {
++        bool enabled = false;
++        if (!ParseBoolean(value, &enabled))
++          return {.error = "fullscreen must be auto, true or false"};
++        config.fullscreen = enabled;
++      }
+     } else if (key == "nickname")
+       config.netplay_nickname = raw_value;
+     else if (key == "address")
+@@ -254,7 +261,8 @@
+           "resolution="
+        << config.resolution << '\n'
+        << "backend=" << graphics_backend << '\n'
+-       << "fullscreen=" << (config.fullscreen ? "true" : "false") << '\n'
++       << "fullscreen="
++       << (config.fullscreen ? (*config.fullscreen ? "true" : "false") : "auto") << '\n'
+        << "show_fps_in_title=" << (config.show_fps_in_title ? "true" : "false")
+        << '\n'
+        << "[Input]\n";
+diff --git a/tools/frontend_config.hpp b/tools/frontend_config.hpp
+--- a/tools/frontend_config.hpp
++++ b/tools/frontend_config.hpp
+@@ -2,6 +2,7 @@
+ 
+ #include <cstdint>
+ #include <filesystem>
++#include <optional>
+ #include <span>
+ #include <string>
+ #include <string_view>
+@@ -25,7 +26,7 @@
+   std::string controller;
+   std::vector<std::string> controllers;
+   bool show_fps_in_title = true;
+-  bool fullscreen = false;
++  std::optional<bool> fullscreen;
+   std::string netplay_nickname = "Player";
+   std::string netplay_address = "127.0.0.1";
+   std::uint16_t netplay_port = 2626;
+diff --git a/tools/moderngekko_run.cpp b/tools/moderngekko_run.cpp
+--- a/tools/moderngekko_run.cpp
++++ b/tools/moderngekko_run.cpp
+@@ -255,7 +255,9 @@
+   config.graphics.internal_resolution_scale = frontend_config.dolphin_scale;
+   if (config.graphics.backend.empty())
+     config.graphics.backend = frontend_config.graphics_backend;
+-  config.fullscreen = frontend_config.fullscreen;
++  const char* launcher_mode = std::getenv("RECOMPLAUNCHER_MODE");
++  config.fullscreen = frontend_config.fullscreen.value_or(
++      launcher_mode && std::string_view(launcher_mode) == "bigpicture");
+   config.show_fps_in_title = frontend_config.show_fps_in_title;
+   if (use_default_mods) {
+     config.mod_directories.push_back(executable_directory / "Mods");
+diff --git a/tools/moderngekko_launcher.cpp b/tools/moderngekko_launcher.cpp
+--- a/tools/moderngekko_launcher.cpp
++++ b/tools/moderngekko_launcher.cpp
+@@ -595,7 +595,7 @@
+   const auto& graphics_backends =
+       moderngekko::frontend::SupportedGraphicsBackends();
+   bool show_fps_in_title = config.show_fps_in_title;
+-  bool fullscreen = config.fullscreen;
++  bool fullscreen = config.fullscreen.value_or(false);
+   std::array<char, 31> netplay_nickname{};
+   std::array<char, 256> netplay_address{};
+   std::snprintf(netplay_nickname.data(), netplay_nickname.size(), "%s",
+@@ -923,7 +923,7 @@
+       ImGui::EndCombo();
+     }
+     ImGui::Spacing();
+-    const bool previous_fullscreen = fullscreen;
++    const auto previous_fullscreen = config.fullscreen;
+     if (ImGui::Checkbox("Start in fullscreen", &fullscreen))
+     {
+       config.fullscreen = fullscreen;
+@@ -933,7 +933,7 @@
+       std::string error;
+       if (!moderngekko::frontend::SaveConfig(user_directory, config, &error))
+       {
+-        fullscreen = previous_fullscreen;
++        fullscreen = previous_fullscreen.value_or(false);
+         config.fullscreen = previous_fullscreen;
+         std::lock_guard lock(dialog.mutex);
+         dialog.error = std::move(error);
