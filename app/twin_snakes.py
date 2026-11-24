@@ -208,6 +208,11 @@ def extract_disc(iso, disc, build, runtime, log, rel_layout):
     return extracted
 
 
+def native_module_ready(module):
+    return (module.is_file() and module.stat().st_size > 0
+            and module.with_name('link.complete').is_file())
+
+
 def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layout=None):
     extracted = extract_disc(iso, disc, build, runtime, log, rel_layout)
     dol = extracted / 'sys/main.dol'
@@ -215,7 +220,7 @@ def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layo
     suffix = '.dll' if os.name == 'nt' else ('.dylib' if sys.platform == 'darwin' else '.so')
     module = module_build / f'g{disc.game_id}_recomp{suffix}'
     module_ready = module_build / 'link.complete'
-    if module.is_file() and module_ready.is_file():
+    if native_module_ready(module):
         return extracted, module
     generated_parent = build / 'generated' / disc.dol_sha256[:16]
     compiler_input = dol
@@ -228,7 +233,8 @@ def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layo
             load_address=int(rel_layout['load_address'], 16),
             bss_address=int(rel_layout['bss_address'], 16)))
         recompiler_options += ['--cpu', 'gekko']
-    # An interrupted link can leave an output without its completion record.
+    # Clear any stale completion record before regenerating the module.
+    module_ready.unlink(missing_ok=True)
     module.unlink(missing_ok=True)
     run([tool(runtime, 'dolrecomp'), *recompiler_options, compiler_input, generated_parent], log, env=env)
     generated = generated_parent / 'generated'
@@ -296,7 +302,9 @@ def prepare(args, runtime, data, log):
     completed = build / 'prepared.json'
     if completed.is_file():
         record = json.loads(completed.read_text(encoding='utf-8'))
-        if record['identity'] == identity and all((data / entry[field]).is_file() for entry in record['discs'] for field in ['dol', 'module']):
+        if (record['identity'] == identity and len(record['discs']) == 2
+                and all((data / entry['dol']).is_file() and native_module_ready(data / entry['module'])
+                        for entry in record['discs'])):
             atomic_json(data / 'prepared.json', record)
             progress(1, 'Already built')
             return

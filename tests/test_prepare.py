@@ -76,6 +76,7 @@ class PrepareTests(unittest.TestCase):
                 suffix = '.dll' if sys.platform == 'win32' else ('.dylib' if sys.platform == 'darwin' else '.so')
                 module = directory / ('gGGSEA4_recomp' + suffix)
                 self.assertFalse(module.is_file())
+                self.assertFalse((directory / 'link.complete').exists())
                 directory.mkdir(parents=True, exist_ok=True)
                 module.write_bytes(b'partial output' if attempts == 1 else b'linked output')
                 if attempts == 1:
@@ -89,6 +90,28 @@ class PrepareTests(unittest.TestCase):
             self.assertEqual(module.read_bytes(), b'linked output')
             self.assertEqual(twin_snakes.build_disc(*args)[1], module)
         self.assertEqual(attempts, 2)
+
+    def test_rebuild_replaces_empty_module_with_stale_completion_record(self):
+        self.write_extraction(self.build / 'disc1')
+        directory = self.build / 'modules' / self.disc.dol_sha256[:16]
+        directory.mkdir(parents=True)
+        suffix = '.dll' if sys.platform == 'win32' else ('.dylib' if sys.platform == 'darwin' else '.so')
+        module = directory / ('gGGSEA4_recomp' + suffix)
+        marker = directory / 'link.complete'
+        module.touch()
+        marker.touch()
+
+        def compile_module(command, *_args, **_kwargs):
+            if command[1] == '--gamecube':
+                (command[-1] / 'generated').mkdir(parents=True)
+            elif command[1] == '--build':
+                self.assertFalse(marker.exists())
+                module.write_bytes(b'linked output')
+
+        with patch.object(twin_snakes, 'run', side_effect=compile_module):
+            _, result = twin_snakes.build_disc(None, self.disc, self.build, self.root, {}, 'cmake', 'cc', None)
+        self.assertEqual(result.read_bytes(), b'linked output')
+        self.assertTrue(marker.is_file())
 
     def test_visible_play_rejects_a_second_install_and_releases_the_lock(self):
         first = self.root / 'first'
