@@ -2,7 +2,7 @@
 
 A work-in-progress native recompilation project for **Metal Gear Solid: The Twin Snakes** on GameCube, with local-disc setup and RecompLauncher integration.
 
-**Development status.** The Windows prototype reaches gameplay. A revision-specific idle fix restores normal speed during boot. Later cutscenes and gameplay still slow down.
+**Development status.** The Windows dev.19 build boots both USA discs with a locally compiled native module and uses JIT fallback for the main gameplay module. Local RecompLauncher setup and Play have been verified. Tower A reached 100% median game speed in sustained replays, with intermittent pacing dips. A complete playthrough remains a release gate.
 
 Players will provide both **USA revision 0** discs matching `supported-builds.json`. Commercial game data and generated game code are never included in this repository or release downloads.
 
@@ -15,7 +15,7 @@ Players will provide both **USA revision 0** discs matching `supported-builds.js
 3. Setup validates the disc pair and recompiles the game locally.
 4. Press Play. The same `TwinSnakes.exe` handles setup and playing; settings, builds and saves live in one movable data folder.
 
-RecompLauncher metadata in this repository is an integration under development. It is not a claim of catalog listing, approved launcher support, or an available playable release.
+Local RecompLauncher development builds use the developer-mode import. Catalog availability follows the release gates.
 
 ## Approach
 
@@ -33,7 +33,7 @@ Windows x64 is the first target. Linux and macOS packaging will follow verified 
 
 ## Resolution and frame rate
 
-The first compatibility target preserves the game's original timing and aspect ratio. Higher internal rendering resolutions and fullscreen output at the monitor's desktop resolution are planned. Uncapped rendering is a later update that must preserve movement speed, animation, physics, audio and cutscene timing. NVIDIA Reflex, DLSS and DLAA are optional experiments after baseline play is stable. See [PERFORMANCE.md](docs/PERFORMANCE.md) for the current measurements and tool comparisons.
+The development build offers higher internal render scales and borderless fullscreen at the monitor's desktop resolution. The display tests still need broader monitor, DPI, HUD and effects coverage. Uncapped rendering follows baseline stability and must preserve movement speed, animation, physics, audio and cutscene timing. NVIDIA Reflex, DLSS and DLAA follow the renderer work. [Performance measurements and tool comparisons](docs/PERFORMANCE.md)
 
 ## Files and saves
 

@@ -327,6 +327,22 @@ Three 75-second Tower A replays used the rebuilt package, warm shader caches, a 
 
 The short speed drops persisted at both scales. This run order shows that a long gap can occur at 1× and leaves the effect of resolution on worst-case pacing open.
 
+### Dev.19 scheduling at default internal resolution
+
+Five 75-second Tower A diagnostic replays used the current runtime, a warm Vulkan shader cache, 1× internal resolution and normal audio. The Windows sampler queried the combined CPU and video thread every 2.57–2.58 ms. Runs 3 and 4 raised only that thread to `THREAD_PRIORITY_ABOVE_NORMAL`. All five reached 100% median game speed and shut down normally. [Windows scheduling priorities](https://learn.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities)
+
+| Run | Thread priority | Speed p05 | Samples below 95% | Longest VBlank interval | Traced VBlank gaps of at least 30 ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 1 | Normal | 96.2% | 11 of 300 | 42.37 ms | 14 |
+| 2 | Normal | 99.5% | 3 of 300 | 38.63 ms | 6 |
+| 3 | Above normal | 99.4% | 4 of 301 | 31.68 ms | 2 |
+| 4 | Above normal | 100.0% | 1 of 301 | 25.39 ms | 0 |
+| 5 | Normal | 100.0% | 0 of 301 | 26.72 ms | 0 |
+
+In the first two runs, 47 of 202 snapshots during the traced gaps showed the thread ready to run. Outside those gaps, 155 of 58,983 snapshots showed the thread ready. None of the long gaps overlapped a traced Vulkan wait, shader compile, cache reset or throttle oversleep. This supports a scheduling contribution to some hitches. The snapshots cannot establish how long each scheduling delay lasted, and the 56 ms gap from the earlier packaged run did not recur in this diagnostic series.
+
+Both above-normal trials had shorter maximum VBlank intervals than the first two normal runs. The final normal control was within 1.33 ms of the shortest maximum and had the fewest speed drops. The release profile uses normal priority. A priority change needs validation under sustained mixed workloads and on another Windows system.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
