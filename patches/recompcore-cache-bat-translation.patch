@@ -1,0 +1,31 @@
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Hooks.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Hooks.cpp
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Hooks.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Hooks.cpp
+@@ -4,6 +4,7 @@
+ #include "Core/PowerPC/StaticRecomp/StaticRecompCore.h"
+ #include "Core/System.h"
+ #include "Core/PowerPC/MMU.h"
++#include "Core/PowerPC/MMUBAT.h"
+ #include "Core/PowerPC/PowerPC.h"
+ #include "Core/PowerPC/JitInterface.h"
+ #include "Core/PowerPC/Interpreter/Interpreter.h"
+@@ -399,7 +400,18 @@
+       else
+       {
+         const u32 line = ea & ~0x1fu;
+-        const auto translated = core->m_mmu.JitCache_TranslateAddress(line);
++        const auto translated = [&] {
++          if (!ppc.msr.IR)
++            return PowerPC::TranslateResult{line};
++
++          // Use the current instruction BAT table. Page translations still go through the MMU.
++          u32 physical = line;
++          bool wi = false;
++          if (PowerPC::TranslateBatAddress(core->m_mmu.GetIBATTable(), &physical, &wi))
++            return PowerPC::TranslateResult{true, physical};
++
++          return core->m_mmu.JitCache_TranslateAddress(line);
++        }();
+         if (translated.valid)
+         {
+           const auto* module = core->m_module;

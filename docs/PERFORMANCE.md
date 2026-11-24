@@ -279,7 +279,30 @@ Four 85-second shared-thread Tower A replays used the same dev.18 diagnostic run
 
 The thread was ready in 89 of 408 snapshots during gaps of at least 30 ms at normal priority, compared with 5 of 129 at above-normal priority. In both priority trials the longest gaps were shorter. Sustained speed varied, including an 89.8% median on the second above-normal replay. This limits the priority result to isolated stalls on this machine. [Microsoft scheduling priorities](https://learn.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities)
 
-A separate normal-priority replay triggered an instruction-pointer sample after sustained slowdown, at 85.1% game speed. Of 766 samples from the busiest host thread, 228 landed in the native game module and 391 in the runtime. The busiest named runtime functions were the instruction fallback hook (67), the native execution loop (54) and the two register synchronization routines (33 combined). Disassembly placed 27 of the hook samples in the code for translating data-cache flush addresses and checking the JIT block cache. The sampler briefly paused the thread for each snapshot, so these counts locate the hot path without measuring the cost of individual instructions. The next CPU comparison should test reducing that lookup cost while preserving code invalidation across address aliases.
+A separate normal-priority replay triggered an instruction-pointer sample after sustained slowdown, at 85.1% game speed. Of 766 samples from the busiest host thread, 228 landed in the native game module and 391 in the runtime. The busiest named runtime functions were the instruction fallback hook (67), the native execution loop (54) and the two register synchronization routines (33 combined). Disassembly placed 27 of the hook samples in the code for translating data-cache flush addresses and checking the JIT block cache. The sampler briefly paused the thread for each snapshot, so these counts locate the hot path without measuring the cost of individual instructions.
+
+### Cache-flush address translation
+
+Upstream Dolphin's x64 JIT checks the translated block cache before invoking invalidation. It can also combine a known cache-flush loop when the instruction sequence and cycle budget permit it. The native runtime invokes a hook per flush, so the first trial reduces the cost of that hook using the runtime's existing instruction address table. Changing the loop itself would require validating its cycle and interruption behavior. [Dolphin x64 cache instruction implementation](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/Core/PowerPC/Jit64/Jit_LoadStore.cpp)
+
+The candidate uses the current instruction BAT table to translate cache-flush addresses with a mapped entry. Translation-disabled addresses are already physical. Addresses that miss the table still use the general MMU. The same block-validity checks and invalidation calls receive the translated address. The guest cycle charge is identical.
+
+Four 70-second runs replayed Tower A with warm shader caches, shared CPU and video threads, windowed 4× Vulkan and Cubeb audio. All four exited normally.
+
+| Run order | Median game speed | Speed p05 | Samples below 95% | VBlank interval p95 | Longest VBlank interval |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Dev.18 | 97.3% | 82.9% | 115 of 280 | 22.21 ms | 48.73 ms |
+| Candidate | 100.0% | 100.0% | 0 of 281 | 17.09 ms | 34.68 ms |
+| Candidate | 100.0% | 99.1% | 3 of 281 | 17.62 ms | 31.84 ms |
+| Dev.18 | 100.0% | 99.1% | 1 of 281 | 17.78 ms | 26.51 ms |
+
+The first dev.18 run reproduced sustained slowdown. The second dev.18 run reached full median speed and had the shortest maximum VBlank interval in the group. The two candidate runs reached full median speed, with some variation in the lowest speed samples and longest gaps.
+
+A diagnostic build compared every 64th cache-flush lookup against the original MMU path. The Heliport and Tower A replays matched on 3,295,835 sampled lookups, of which 3,293,252 used an instruction BAT mapping and 2,583 reported an invalid address. Both replays exited normally. Page-table misses still call the original translator.
+
+Four 36-second, headless Tower A replays measured Windows CPU time on the emulation thread per recorded video update. In the first run order the cost fell from 16.906 to 16.178 ms per update. In the reverse order it fell from 16.647 to 16.012 ms. That frees about 4% of the thread's CPU budget in this checkpoint. The original 59.94 Hz video timing gives a wall-time budget of about 16.68 ms per update. The headless runs isolate CPU cost from window presentation.
+
+The packaged dev.19 runner completed a 22-second Tower A audio capture at 4× Vulkan. It reached 100.0% median and 99.69% minimum sampled game speed, with a longest VBlank interval of 21.84 ms. The per-process Windows capture recorded 2,200 packets, zero reported discontinuities, and zero timestamp gaps over 2 ms among packets with valid timestamps.
 
 ## Tool comparisons
 
