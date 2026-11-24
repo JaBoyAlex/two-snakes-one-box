@@ -359,6 +359,12 @@ def play(args, runtime, data, log):
 
 
 def main():
+    if os.environ.get('RECOMPLAUNCHER') == '1':
+        # RecompLauncher reads the setup pipes as UTF-8, including filenames in progress messages.
+        for stream in (sys.stdout, sys.stderr):
+            if stream is not None:
+                stream.reconfigure(encoding='utf-8', errors='backslashreplace')
+
     parser = argparse.ArgumentParser(description='Twin Snakes Recomp development setup and player')
     parser.add_argument('--prepare', action='store_true')
     parser.add_argument('--experimental-rel', action='store_true',

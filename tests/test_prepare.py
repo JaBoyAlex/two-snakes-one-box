@@ -1,4 +1,5 @@
 import hashlib
+import io
 from pathlib import Path
 import sys
 import tempfile
@@ -112,6 +113,28 @@ class PrepareTests(unittest.TestCase):
             _, result = twin_snakes.build_disc(None, self.disc, self.build, self.root, {}, 'cmake', 'cc', None)
         self.assertEqual(result.read_bytes(), b'linked output')
         self.assertTrue(marker.is_file())
+
+    def test_recomplauncher_setup_writes_utf8_on_both_pipes(self):
+        filename = 'Disc \u00e9 \u6e2c\u8a66.rvz'
+
+        def prepare(*_args):
+            twin_snakes.progress(0.04, f'Checking {filename}')
+            raise twin_snakes.SetupError(f'Cannot read {filename}', 22)
+
+        with (
+            io.TextIOWrapper(io.BytesIO(), encoding='cp1252') as stdout,
+            io.TextIOWrapper(io.BytesIO(), encoding='cp1252') as stderr,
+            patch('sys.stdout', stdout),
+            patch('sys.stderr', stderr),
+            patch.dict('os.environ', {'RECOMPLAUNCHER': '1'}),
+            patch('sys.argv', ['TwinSnakes.exe', '--prepare', '--data', str(self.root)]),
+            patch.object(twin_snakes, 'prepare', side_effect=prepare),
+        ):
+            self.assertEqual(twin_snakes.main(), 22)
+            stdout.flush()
+            stderr.flush()
+            self.assertIn(f'progress 0.040 Checking {filename}', stdout.buffer.getvalue().decode('utf-8'))
+            self.assertIn(f'Error: Cannot read {filename}', stderr.buffer.getvalue().decode('utf-8'))
 
     def test_visible_play_rejects_a_second_install_and_releases_the_lock(self):
         first = self.root / 'first'
