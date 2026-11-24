@@ -21,6 +21,8 @@ def main():
     parser.add_argument('--vc-runtime-dir', type=Path, help='Visual Studio x64 Microsoft.VC143.CRT directory')
     parser.add_argument('--output', type=Path, default=ROOT / 'dist')
     parser.add_argument('--version', default='0.1.0-dev')
+    parser.add_argument('--stage-only', action='store_true',
+                        help='Prepare a local RecompLauncher build folder without creating an archive')
     args = parser.parse_args()
     if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?', args.version):
         parser.error('--version must be a version such as 0.1.0-dev')
@@ -70,6 +72,9 @@ def main():
     # runtime and entry point; this does not constitute a gameplay check.
     subprocess.run([str(stage / 'TwinSnakes.exe'), '--help'], check=True)
     subprocess.run([str(stage / 'runtime/moderngekko-run.exe'), '--help'], check=True)
+    if args.stage_only:
+        print(f'Local RecompLauncher build folder: {stage}')
+        return
     args.output.mkdir(parents=True, exist_ok=True)
     archive = args.output / f'Two-Snakes-One-Box-v{args.version}-Windows-x64.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:

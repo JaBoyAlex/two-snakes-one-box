@@ -82,6 +82,10 @@ The 1× and 4× runs had similar median speed and 95th-percentile render interva
 
 A pre-patch windowed Vulkan reference reached 99.7% median speed with an 18.37 ms 95th-percentile render interval. Rebuilding the display patch without the JIT timing probe gave 99.0% and 22.15 ms in the same windowed replay. The rebuilt runner reached 97.2% and 19.13 ms in fullscreen at 4×. These short runs still show pacing dips and warrant repeated comparisons before qualifying the display change for wider testing.
 
+In a later interactive test at 4× fullscreen, the tester reported slow motion. Live samples showed 85–94% game speed with the busiest thread using roughly one logical CPU. The tester's replay was restarted at the same checkpoint at 1× fullscreen. A later interactive sample ranged from 91% to 100%, with 18 of 19 samples at 97% or better. These captures include live input and cover different intervals after loading. Longer matched captures are needed to measure how much of the slowdown comes from rendering at higher scale.
+
+After the tester reported minimizing and restoring, Windows reported a maximized window with a menu and a 2556 × 1345 client area on the 2560 × 1440 desktop. The profile still requested 1×. The renderer recalculates the internal scale on resize only in its automatic scale mode. This observation verifies the smaller presentation area. A controlled minimize and restore is needed to identify how fullscreen was left. A new local save state from this session is available for matched replays.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
