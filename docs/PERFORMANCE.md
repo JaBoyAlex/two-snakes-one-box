@@ -40,6 +40,8 @@ python scripts/benchmark_boot.py --data .local/player --runner .local/runtime/mo
 
 Use an idle machine and the same disc and scene for comparisons. Pass `--disc 2 --load-state PATH` for a checkpoint captured on Disc 2. The default headless run isolates the CPU path. `--offscreen Vulkan` (also `--offscreen-vulkan`) exercises rendering without a visible window or audio. `--windowed` adds display presentation and normal audio with Vulkan by default. Pass `D3D` for Direct3D 11 or `D3D12` for Direct3D 12 to either option. `--dual-core` enables separate CPU and video threads in the isolated benchmark profile. Add `--frame-times` to a windowed run for median, 95th-percentile and maximum render and vertical blank intervals after warmup. The runtime render counter includes repeated presents when they are enabled. These intervals measure runtime events. Use OS-level tracing to measure when frames reach the display. Generated outputs, logs and capture files stay local.
 
+Use `--compare-threading` to run shared and separate CPU/video threads in both orders against the same runner and checkpoint. It defaults to hybrid execution. With `--shader-cache-seed PATH`, every run starts with its own copy of the supplied local `Cache` directory. Seed from a completed run with the same backend and GPU so each case starts with the same pipeline data.
+
 Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay. Benchmark profiles and logs default to a subdirectory of the system temporary directory. Use `--output PATH` to retain traces elsewhere. One run in a synced workspace failed to replace the test profile's filesystem metadata (`IOS_FS: Failed to rename temporary FST file`). Repeat runs with isolated profiles outside the synced workspace completed successfully.
 
 To compare display settings, use `--windowed Vulkan --fullscreen --frame-times` and repeat the same checkpoint with `--internal-scale 1` and `--internal-scale 4`. Fullscreen sets the presentation surface to the current monitor's desktop size. Internal scale controls the GameCube render targets independently. The Windows test runtime opened directly with a 2560 × 1440 client area, restored its windowed geometry, and returned to a 2560 × 1440 client area. Other monitors, DPI settings, HUD placement, and graphics effects remain to be checked.
@@ -248,6 +250,19 @@ Three 90-second, shared-thread Tower A diagnostic runs used the same instrumente
 The populated cache had fewer long intervals than the empty cache in this pair. The missing-directory run also had one long interval. These runs establish the persistence bug and show run-to-run variation in the remaining hitches.
 
 During the warm run's 73.66 ms VBlank gap, presentation ran for 55.6 ms and the same thread spent 55.4 ms inside a Vulkan fence wait. The traced shader compile and native cache-reset events occurred outside that gap. A separate diagnostic run sampled the emulation thread in Windows' Ready state inside two gaps of about 40 ms. The snapshots identify periods when the thread was runnable and cannot measure the full time it spent waiting to run. Identify the work behind the Vulkan fence and keep checking scheduling gaps under normal playback.
+
+Two further 90-second warm-cache Tower A runs used 4× Vulkan and normal audio. The probe distinguished fence waits for descriptor and command buffer reuse, synchronous submissions, upload buffers, and readbacks. Both runs reached 100.0% median game speed and shut down normally. The longest VBlank intervals were 34.43 and 78.91 ms. The second run's 78.91 ms gap had no overlapping probe event and Windows reported no additional emulation-thread CPU time during the gap. The only Vulkan fence waits of at least 5 ms in either run were synchronous staging-texture flushes during startup, before the measured segment. The origin of the earlier presentation fence wait remains open.
+
+Four matched 70-second Tower A runs used the same dev.18 diagnostic runner, Disc 2 checkpoint, warm cache, windowed 4× Vulkan and Cubeb audio. Each run collected 281 speed samples and shut down normally.
+
+| Run order | Median game speed | Speed p05 | Samples below 95% | VBlank interval p95 | Longest VBlank interval | VBlank intervals over 50 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Shared | 100.1% | 91.2% | 33 | 19.84 ms | 51.23 ms | 1 |
+| Separate | 100.0% | 89.9% | 22 | 19.32 ms | 99.93 ms | 7 |
+| Separate | 100.0% | 95.8% | 11 | 19.08 ms | 41.23 ms | 0 |
+| Shared | 100.0% | 93.9% | 24 | 19.65 ms | 39.11 ms | 0 |
+
+Separate threads yielded fewer samples below 95% in both run orders. One separate-thread run had seven VBlank intervals over 50 ms in a single burst about 55 seconds after loading the checkpoint. No traced Vulkan wait overlapped the burst. The launcher still defaults to shared threads. A Windows scheduling trace that covers a reproduced burst would help distinguish host scheduling from untraced blocking in the runtime.
 
 ## Tool comparisons
 
