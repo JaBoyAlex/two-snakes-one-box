@@ -216,6 +216,21 @@ The half-second render gap occurred in all three Tower A configurations. A match
 
 A separate host capture started 32.5 seconds into the Tower A replay at 92.6% sampled game speed. Of 768 instruction-pointer samples on the busiest thread, 237 landed in the compiled boot module. Named runtime functions included the native run loop (67), instruction fallback (38), and two register-state synchronization functions (40 combined). Use these counts to target generated code and transitions between CPU paths. The sampler paused the CPU thread to collect each instruction pointer.
 
+### Register synchronization
+
+A dev.16 process logged about 75 million native bursts across startup and the 90-second shared-thread Tower A replay. Each burst copies the guest register state into and out of the compiled module. The x64 trial packs or unpacks two paired floating-point registers at a time with SSE2 and gets the timebase and its cycle remainder from one tick sample. Disassembly confirmed vector shuffles in both directions. The two synchronization routines measured about half the combined reference size through their next symbol boundaries.
+
+The packaged dev.16 runner and the candidate each completed two 90-second Tower A replays in alternating order. Both used shared threads, fresh profiles, 4× Vulkan and normal Cubeb audio. Each run collected 360 speed samples and exited normally.
+
+| Runner | Median game speed | Speed p05 | Lowest sample | Samples below 95% | Vertical blank interval p95 | Longest vertical blank interval |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Dev.16 | 96.8%, 94.5% | 82.0%, 87.1% | 69.9%, 76.8% | 125, 204 | 21.82, 21.68 ms | 47.60, 47.70 ms |
+| Register sync trial | 98.8%, 98.6% | 86.4%, 85.7% | 62.1%, 60.3% | 65, 68 | 20.62, 20.96 ms | 47.60, 103.24 ms |
+
+The candidate registered fewer samples below 95% in both comparisons. Its lowest speed samples and one vertical blank interval were worse. Sustained game speed improved in this replay, and the isolated pacing dips still need investigation.
+
+A round-trip test preserved all 65,536 test lane values, including NaN payloads and signed zeros. Headless Tower A trace and DSP captures varied between trials. The first candidate dump differed after 4.371 seconds of DSP audio, and two runs of the dev.16 reference also had different native traces. A repeated candidate run matched all 273 comparable dispatch records from the first dev.16 run, including the guest timebase and downcount. Its 22.333 seconds of overlapping DSP audio also matched sample for sample.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.

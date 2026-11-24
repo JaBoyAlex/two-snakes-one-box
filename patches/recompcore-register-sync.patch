@@ -1,0 +1,106 @@
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Sync.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Sync.cpp
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Sync.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Sync.cpp
+@@ -8,14 +8,34 @@
+ #include "Core/PowerPC/StaticRecomp/StaticRecompCore.h"
+ #include "Core/System.h"
+ 
++#ifdef _M_X86_64
++#include <emmintrin.h>
++
++static_assert(sizeof(PowerPC::PairedSingle) == sizeof(__m128i));
++#endif
++
+ void StaticRecompCore::SetPPCStateFromGuestState(const CPUState& s, PowerPC::PowerPCState& ppc)
+ {
+   std::memcpy(ppc.gpr, s.gpr, sizeof(ppc.gpr));
++#ifdef _M_X86_64
++  // Repack two registers at a time without interpreting the lane bits as floats.
++  for (int i = 0; i < 32; i += 2)
++  {
++    __m128i lane0, lane1;
++    std::memcpy(&lane0, &s.fpr[i], sizeof(lane0));
++    std::memcpy(&lane1, &s.ps1[i], sizeof(lane1));
++    const __m128i first = _mm_unpacklo_epi64(lane0, lane1);
++    const __m128i second = _mm_unpackhi_epi64(lane0, lane1);
++    std::memcpy(&ppc.ps[i], &first, sizeof(first));
++    std::memcpy(&ppc.ps[i + 1], &second, sizeof(second));
++  }
++#else
+   for (int i = 0; i < 32; ++i)
+   {
+     std::memcpy(&ppc.ps[i].ps0, &s.fpr[i], sizeof(u64));
+     std::memcpy(&ppc.ps[i].ps1, &s.ps1[i], sizeof(u64));
+   }
++#endif
+   ppc.pc = s.pc;
+   ppc.npc = s.pc;
+   ppc.spr[SPR_LR] = s.lr;
+@@ -46,15 +66,27 @@
+ 
+ void StaticRecompCore::SyncIn()
+ {
+-  auto& power_pc = m_system.GetPowerPC();
+-  auto& ppc = power_pc.GetPPCState();
++  const auto& ppc = m_ppc_state;
+ 
+   std::memcpy(m_guest.gpr, ppc.gpr, sizeof(m_guest.gpr));
++#ifdef _M_X86_64
++  for (int i = 0; i < 32; i += 2)
++  {
++    __m128i first, second;
++    std::memcpy(&first, &ppc.ps[i], sizeof(first));
++    std::memcpy(&second, &ppc.ps[i + 1], sizeof(second));
++    const __m128i lane0 = _mm_unpacklo_epi64(first, second);
++    const __m128i lane1 = _mm_unpackhi_epi64(first, second);
++    std::memcpy(&m_guest.fpr[i], &lane0, sizeof(lane0));
++    std::memcpy(&m_guest.ps1[i], &lane1, sizeof(lane1));
++  }
++#else
+   for (int i = 0; i < 32; ++i)
+   {
+     std::memcpy(&m_guest.fpr[i], &ppc.ps[i].ps0, sizeof(u64));
+     std::memcpy(&m_guest.ps1[i], &ppc.ps[i].ps1, sizeof(u64));
+   }
++#endif
+   m_guest.pc = ppc.pc;
+   m_guest.lr = ppc.spr[SPR_LR];
+   m_guest.ctr = ppc.spr[SPR_CTR];
+@@ -72,12 +104,13 @@
+     m_guest.sr[i] = ppc.sr[i];
+   for (int i = 0; i < 8; ++i)
+     m_guest.gqr[i] = ppc.spr[SPR_GQR0 + i];
+-  // Dolphin materializes TB lazily on read (spr[TL/TU] is a stale cache);
+-  // GetFakeTimeBase() is the live value, matching the interpreter's mftb.
+-  m_guest.timebase = m_system.GetSystemTimers().GetFakeTimeBase();
++  // Sample the same guest clock used by mftb. Use one tick count for the
++  // timebase and the cycles carried into its next increment.
+   const auto& core_timing = m_system.GetCoreTiming();
+-  m_timebase_cycle_remainder =
+-      (core_timing.GetTicks() - core_timing.GetFakeTBStartTicks()) % SystemTimers::TIMER_RATIO;
++  const u64 ticks_since_start = core_timing.GetTicks() - core_timing.GetFakeTBStartTicks();
++  m_guest.timebase =
++      core_timing.GetFakeTBStartValue() + ticks_since_start / SystemTimers::TIMER_RATIO;
++  m_timebase_cycle_remainder = ticks_since_start % SystemTimers::TIMER_RATIO;
+   m_guest.reserve_addr = ppc.reserve_address;
+   m_guest.reserve_valid = ppc.reserve;
+   m_guest.exception = 0;
+@@ -90,8 +123,7 @@
+ 
+ void StaticRecompCore::SyncOut()
+ {
+-  auto& power_pc = m_system.GetPowerPC();
+-  auto& ppc = power_pc.GetPPCState();
++  auto& ppc = m_ppc_state;
+ 
+   // Flush any cycle charge the module accumulated since the last flush
+   // (matters on the mid-dispatch fallback path, where the interpreter step
+@@ -105,7 +137,7 @@
+   if (ppc.msr.Hex != m_guest.msr)
+   {
+     ppc.msr.Hex = m_guest.msr;
+-    power_pc.MSRUpdated();
++    m_system.GetPowerPC().MSRUpdated();
+   }
+   PowerPC::RoundingModeUpdated(ppc);
+ }
