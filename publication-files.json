@@ -35,6 +35,7 @@
   "patches/recompcore-llvm-region-check.patch",
   "patches/recompcore-twin-snakes-idle.patch",
   "patches/recompcore-verified-virtual-code.patch",
+  "patches/recompcore-win32-fullscreen.patch",
   "patches/recompcore-win32-window-teardown.patch",
   "docs/BUILDING.md",
   "docs/ROADMAP.md",

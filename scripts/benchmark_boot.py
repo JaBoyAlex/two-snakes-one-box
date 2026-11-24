@@ -40,13 +40,15 @@ def summarize_intervals(path, start, end):
 
 
 def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load_state, dispatch_samples,
-              *, dual_core=False, frame_times=False):
+              *, dual_core=False, frame_times=False, internal_scale=1, fullscreen=False):
     control = work / 'control'
     command_dir = control / 'commands'
     command_dir.mkdir(parents=True)
     user = work / 'user'
     user.mkdir()
-    (user / 'config.ini').write_text('resolution=640x528\nbackend=Vulkan\nfullscreen=false\n')
+    (user / 'config.ini').write_text(f'resolution={640 * internal_scale}x{528 * internal_scale}\n'
+                                   f'backend=Vulkan\nfullscreen={str(fullscreen).lower()}\n',
+                                   encoding='ascii')
     config = user / 'Config'
     if dual_core or frame_times:
         config.mkdir()
@@ -127,7 +129,8 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
 
     summary = {'cpu': mode, 'graphics': backend, 'headless': not windowed, 'exit_code': process.returncode,
                'completed': completed, 'forced_stop': forced_stop,
-               'sample_count': len(samples), 'samples': samples}
+               'sample_count': len(samples), 'samples': samples,
+               'internal_scale_requested': internal_scale, 'fullscreen_requested': fullscreen}
     if dual_core:
         summary['dual_core_requested'] = True
     if frame_times and completed:
@@ -160,6 +163,9 @@ def main():
     parser.add_argument('--seconds', type=int, default=20)
     parser.add_argument('--dual-core', action='store_true', help='Test separate CPU and video threads in the isolated profile')
     parser.add_argument('--frame-times', action='store_true', help='Record render and video update intervals in windowed mode')
+    parser.add_argument('--internal-scale', type=int, default=1, metavar='N',
+                        help='Integer EFB render scale in the isolated profile, from 1 to 12 (default: 1)')
+    parser.add_argument('--fullscreen', action='store_true', help='Start the windowed benchmark in borderless fullscreen')
     parser.add_argument('--mode', choices=['aot', 'jit', 'both'],
                         help='Default: both, or aot for --compare-module')
     display = parser.add_mutually_exclusive_group()
@@ -173,11 +179,15 @@ def main():
     args = parser.parse_args()
     if not 5 <= args.seconds <= 300:
         parser.error('--seconds must be between 5 and 300')
+    if not 1 <= args.internal_scale <= 12:
+        parser.error('--internal-scale must be between 1 and 12')
     if args.compare_module and args.mode not in (None, 'aot'):
         parser.error('--compare-module requires AOT mode')
     windowed = args.windowed is not None
     if args.frame_times and not windowed:
         parser.error('--frame-times requires --windowed')
+    if args.fullscreen and not windowed:
+        parser.error('--fullscreen requires --windowed')
     data = args.data.resolve()
     prepared = json.loads((data / 'prepared.json').read_text())
     disc = prepared['discs'][0]
@@ -200,7 +210,8 @@ def main():
         outcomes.append(benchmark(mode, runner, data / disc['root'], selected_module,
                                   work / label, windowed, backend, args.seconds,
                                   load_state, args.dispatch_samples, dual_core=args.dual_core,
-                                  frame_times=args.frame_times))
+                                  frame_times=args.frame_times, internal_scale=args.internal_scale,
+                                  fullscreen=args.fullscreen))
     print(f'Private logs and samples: {work}')
     return 0 if all(outcomes) else 1
 

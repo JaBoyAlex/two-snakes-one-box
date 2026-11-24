@@ -108,7 +108,7 @@
       "id": "display",
       "label": "Display",
       "group": "Video",
-      "help": "Fullscreen uses the desktop display mode and keeps the original aspect ratio.",
+      "help": "Borderless fullscreen uses the current monitor's desktop resolution.",
       "defaults": {
         "fullscreen": "false"
       },
@@ -120,7 +120,7 @@
           }
         },
         {
-          "label": "Fullscreen",
+          "label": "Borderless fullscreen",
           "set": {
             "fullscreen": "true"
           }
@@ -131,7 +131,7 @@
       "id": "resolution",
       "label": "Internal resolution",
       "group": "Video",
-      "help": "Development settings; higher resolution still needs gameplay and effects validation.",
+      "help": "Scales the GameCube render targets independently of the display resolution.",
       "defaults": {
         "resolution": "640x528"
       },

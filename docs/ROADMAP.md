@@ -34,12 +34,12 @@
 ## 5. Frame-rate work
 
 - Trace gameplay updates, animation, physics, camera transforms, input sampling and decoder frame timing using replays at the original game speed.
-- Prototype higher-rate rendering from interpolated camera and object state while retaining the original simulation and audio clocks. Check that interpolating a scene causes no gameplay state changes.
+- Prototype direct rendering from camera and animation evaluated at the presentation cadence. Compare gameplay state, script timing, and audio against the original run.
 - Include real-time cutscenes. Compare camera cuts, animation cues and dialogue timing with the original. Preserve source cadence and audio sync for prerecorded footage before evaluating optional smoothing.
 - Keep the original frame-rate mode available.
 - Test fixed 60/120/144 Hz and variable refresh at monitor-native output without changing game speed or audio timing.
 - Expose an unlocked option in RecompLauncher only after those tests pass.
-- Validate that world simulation, game timers, DSP/audio mixing, dialogue and movies advance at the same rate with the cap removed. Report simulation ticks, scene renders (including renders from interpolated state), repeated presents and video interpolation separately.
+- Validate that world simulation, game timers, DSP/audio mixing, dialogue and movies advance at the same rate with the cap removed. Report simulation ticks, scene renders, repeated presents and video playback cadence separately.
 
 ## 6. Optional PC graphics features
 

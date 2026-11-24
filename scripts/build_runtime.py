@@ -40,7 +40,8 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch',
                 after=('recompcore-auto-gamepad.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-empty-gamepad-config.patch')
-    apply_patch(source / 'vendor/dolphin', 'recompcore-win32-window-teardown.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-win32-fullscreen.patch',
+                after=('recompcore-win32-window-teardown.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-fastmem.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-verified-virtual-code.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-headless-shader-progress.patch')
