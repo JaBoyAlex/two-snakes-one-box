@@ -264,6 +264,23 @@ Four matched 70-second Tower A runs used the same dev.18 diagnostic runner, Disc
 
 Separate threads yielded fewer samples below 95% in both run orders. One separate-thread run had seven VBlank intervals over 50 ms in a single burst about 55 seconds after loading the checkpoint. No traced Vulkan wait overlapped the burst. The launcher still defaults to shared threads. A Windows scheduling trace that covers a reproduced burst would help distinguish host scheduling from untraced blocking in the runtime.
 
+### Windows scheduling
+
+Windows Performance Recorder could not start the system CPU trace from the test account. A local sampler queried the game threads about every 2.57 ms. The median query took 10–20 µs. The sampler recorded whether a thread was running, ready for a processor, or waiting. These snapshots cannot establish the duration of an individual wait. [Microsoft thread state definitions](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.threadstate)
+
+Four 85-second shared-thread Tower A replays used the same dev.18 diagnostic runner, warm cache, 4× Vulkan and Cubeb audio. For the middle two runs, the test raised just the combined CPU and video thread from normal to above-normal priority. All four exited normally.
+
+| Thread priority | Median game speed | Speed p05 | Samples below 95% | VBlank interval p95 | Longest VBlank interval | VBlank gaps of at least 30 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Normal | 99.6% | 83.3% | 120 of 340 | 22.20 ms | 48.45 ms | 13 |
+| Above normal | 100.0% | 85.6% | 56 of 340 | 20.63 ms | 35.59 ms | 6 |
+| Above normal | 89.8% | 80.6% | 209 of 340 | 23.57 ms | 32.80 ms | 6 |
+| Normal | 94.3% | 79.8% | 183 of 340 | 23.02 ms | 60.07 ms | 22 |
+
+The thread was ready in 89 of 408 snapshots during gaps of at least 30 ms at normal priority, compared with 5 of 129 at above-normal priority. In both priority trials the longest gaps were shorter. Sustained speed varied, including an 89.8% median on the second above-normal replay. This limits the priority result to isolated stalls on this machine. [Microsoft scheduling priorities](https://learn.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities)
+
+A separate normal-priority replay triggered an instruction-pointer sample after sustained slowdown, at 85.1% game speed. Of 766 samples from the busiest host thread, 228 landed in the native game module and 391 in the runtime. The busiest named runtime functions were the instruction fallback hook (67), the native execution loop (54) and the two register synchronization routines (33 combined). Disassembly placed 27 of the hook samples in the code for translating data-cache flush addresses and checking the JIT block cache. The sampler briefly paused the thread for each snapshot, so these counts locate the hot path without measuring the cost of individual instructions. The next CPU comparison should test reducing that lookup cost while preserving code invalidation across address aliases.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
