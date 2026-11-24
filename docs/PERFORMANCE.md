@@ -38,7 +38,7 @@ The tester reported better pacing, including intervals close to normal speed, wi
 python scripts/benchmark_boot.py --data .local/player --runner .local/runtime/moderngekko-run.exe
 ```
 
-Use an idle machine and the same disc and scene for comparisons. The default headless run isolates the CPU path. `--offscreen Vulkan` (also `--offscreen-vulkan`) exercises rendering without a visible window or audio. `--windowed` adds display presentation and normal audio with Vulkan by default. Pass `D3D` for Direct3D 11 or `D3D12` for Direct3D 12 to either option. `--dual-core` enables separate CPU and video threads in the isolated benchmark profile. Add `--frame-times` to a windowed run for median, 95th-percentile and maximum render and vertical blank intervals after warmup. The runtime render counter includes repeated presents when they are enabled. These intervals measure runtime events. Use OS-level tracing to measure when frames reach the display. Generated outputs, logs and capture files stay local.
+Use an idle machine and the same disc and scene for comparisons. Pass `--disc 2 --load-state PATH` for a checkpoint captured on Disc 2. The default headless run isolates the CPU path. `--offscreen Vulkan` (also `--offscreen-vulkan`) exercises rendering without a visible window or audio. `--windowed` adds display presentation and normal audio with Vulkan by default. Pass `D3D` for Direct3D 11 or `D3D12` for Direct3D 12 to either option. `--dual-core` enables separate CPU and video threads in the isolated benchmark profile. Add `--frame-times` to a windowed run for median, 95th-percentile and maximum render and vertical blank intervals after warmup. The runtime render counter includes repeated presents when they are enabled. These intervals measure runtime events. Use OS-level tracing to measure when frames reach the display. Generated outputs, logs and capture files stay local.
 
 Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay. Benchmark profiles and logs default to a subdirectory of the system temporary directory. Use `--output PATH` to retain traces elsewhere. One run in a synced workspace failed to replace the test profile's filesystem metadata (`IOS_FS: Failed to rename temporary FST file`). Repeat runs with isolated profiles outside the synced workspace completed successfully.
 
@@ -122,9 +122,30 @@ A matched Windows process loopback test replayed the saved dialogue scene in win
 | Hybrid | Shared | 100.2% | 90.6% |
 | Hybrid | Separate | 100.3% | 98.6% |
 
-The shared-thread hybrid run still dipped below full speed. The loopback measured packet continuity for one scene. Listening for repeated or distorted audio under sustained load and testing later scenes remain open.
+The shared-thread hybrid run still dipped below full speed. Listening for repeated or distorted audio under sustained load remains open.
 
 The in-game Digital Camera wrote a valid photo after enabling external framebuffer copies to guest memory. A separate dock replay tested this option at 4× internal resolution with offscreen Vulkan and separate CPU and video threads. The four runs compared both settings in both orders. Median game speeds were 92.4–94.1% with the default and 96.7–96.8% with photo capture enabled. This single checkpoint showed no slowdown from the option. Its cost in other scenes and graphics backends is unmeasured.
+
+## Late-game replays
+
+Dev.14 replayed the Tower A alarm and ensuing guard activity, the Hind fight, and the Underground Passage flashback. Each run used an isolated Windows profile, Vulkan at 4× internal resolution, and Cubeb output. Tower A used 12-second windows and the other scenes used 22-second windows. All eight runs exited normally. Windows reported zero packet discontinuities and zero gaps over 2 ms between packets with valid timestamps. The capture measures packet delivery and cannot establish audible quality while the game clock slows.
+
+| Scene | CPU mode and threading | Median game speed | Lowest sampled speed | 95th-percentile render interval | 95th-percentile vertical blank interval |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Tower A alarm | Hybrid, shared | 76.2% | 72.5% | 24.26 ms | 24.22 ms |
+| Tower A alarm | Hybrid, separate | 77.2% | 72.6% | 25.39 ms | 25.18 ms |
+| Hind fight | Hybrid, shared | 100.0% | 98.7% | 17.74 ms | 16.69 ms |
+| Hind fight | Hybrid, separate | 100.0% | 92.3% | 17.55 ms | 16.70 ms |
+| Hind fight | JIT, shared | 100.0% | 100.0% | 16.74 ms | 16.69 ms |
+| Underground Passage flashback | Hybrid, shared | 100.0% | 95.9% | 66.74 ms | 20.36 ms |
+| Underground Passage flashback | Hybrid, separate | 100.0% | 93.0% | 66.77 ms | 20.41 ms |
+| Underground Passage flashback | JIT, shared | 100.0% | 99.9% | 66.74 ms | 16.69 ms |
+
+The flashback had nearly identical render intervals at the 95th percentile in every run, including the JIT reference at full speed. The Tower A slowdown persisted in the latter part of the replay with either threading setting.
+
+Separate-thread headless runs of the same Tower A checkpoint reached median speeds of 81.8% with output disabled, 80.4% with offscreen Vulkan at 1×, and 78.9% with offscreen Vulkan at 4×. JIT reached 100% with output disabled and with offscreen Vulkan at 4×. Each run completed 49 samples. The hybrid CPU path accounts for most of the observed slowdown in this replay.
+
+A separate symbolized run with output disabled collected 579 instruction-pointer samples from the busiest thread. The runner accounted for 373 samples and the compiled boot module for 135. Among named runner functions, the static recomp run loop had 85 samples, its instruction-cache invalidation handler had 44, and native address resolution and its lookup helper had 51. The JIT block-cache invalidation function had 22. These are starting points for profiling repeated invalidations and address lookup before changing frame timing.
 
 ## Tool comparisons
 

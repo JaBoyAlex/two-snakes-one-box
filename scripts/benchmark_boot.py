@@ -40,7 +40,8 @@ def summarize_intervals(path, start, end):
 
 
 def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load_state, dispatch_samples,
-              *, dual_core=False, frame_times=False, internal_scale=1, fullscreen=False):
+              *, dual_core=False, frame_times=False, internal_scale=1, fullscreen=False,
+              alternate_disc=None):
     control = work / 'control'
     command_dir = control / 'commands'
     command_dir.mkdir(parents=True)
@@ -64,6 +65,8 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
     env.pop('STATICRECOMP_DISPATCH_SAMPLES', None)
     env.pop('STATICRECOMP_TRACE_FILE', None)
     env.pop('STATICRECOMP_FALLBACK_RANGES', None)
+    if alternate_disc is not None:
+        env['MODERNGEKKO_ALTERNATE_DISC'] = str(alternate_disc)
     if dispatch_samples and mode == 'aot':
         env['STATICRECOMP_DISPATCH_SAMPLES'] = '1'
     command = [str(runner), '--game', str(game), '--module', str(module),
@@ -156,7 +159,9 @@ def main():
     parser.add_argument('--module', type=Path, help='Test a candidate module instead of the prepared module')
     parser.add_argument('--compare-module', type=Path,
                         help='Compare a candidate against --module or the prepared module in both run orders')
-    parser.add_argument('--load-state', type=Path, help='Replay a local Disc 1 save state for a scene comparison')
+    parser.add_argument('--disc', type=int, choices=[1, 2], default=1,
+                        help='Boot the selected prepared disc (default: 1)')
+    parser.add_argument('--load-state', type=Path, help='Replay a local save state for the selected disc')
     parser.add_argument('--dispatch-samples', action='store_true', help='Log the busiest native dispatch sites on shutdown')
     parser.add_argument('--output', type=Path,
                         help='Directory for isolated profiles and logs (default: system temporary directory)')
@@ -190,7 +195,12 @@ def main():
         parser.error('--fullscreen requires --windowed')
     data = args.data.resolve()
     prepared = json.loads((data / 'prepared.json').read_text())
-    disc = prepared['discs'][0]
+    discs = prepared['discs']
+    if args.disc > len(discs):
+        parser.error(f'Disc {args.disc} is missing from the prepared data')
+    disc = discs[args.disc - 1]
+    alternate_dol = discs[2 - args.disc].get('dol') if len(discs) == 2 else None
+    alternate_disc = data / alternate_dol if alternate_dol else None
     module = args.module.resolve(strict=True) if args.module else data / disc['module']
     runner = args.runner.resolve(strict=True)
     load_state = args.load_state.resolve(strict=True) if args.load_state else None
@@ -211,7 +221,7 @@ def main():
                                   work / label, windowed, backend, args.seconds,
                                   load_state, args.dispatch_samples, dual_core=args.dual_core,
                                   frame_times=args.frame_times, internal_scale=args.internal_scale,
-                                  fullscreen=args.fullscreen))
+                                  fullscreen=args.fullscreen, alternate_disc=alternate_disc))
     print(f'Private logs and samples: {work}')
     return 0 if all(outcomes) else 1
 
