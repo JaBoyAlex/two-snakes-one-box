@@ -1,0 +1,18 @@
+diff --git a/Source/Core/Core/HW/GCPad.cpp b/Source/Core/Core/HW/GCPad.cpp
+--- a/Source/Core/Core/HW/GCPad.cpp
++++ b/Source/Core/Core/HW/GCPad.cpp
+@@ -30,8 +30,12 @@
+ 
+ static void UpdateDefaultGamepad()
+ {
+-  if (!s_auto_gamepad_enabled ||
+-      File::Exists(File::GetUserPath(D_CONFIG_IDX) + "GCPadNew.ini"))
++  if (!s_auto_gamepad_enabled)
++    return;
++
++  // A fresh profile can have an empty file before any bindings are saved.
++  const std::string config_path = File::GetUserPath(D_CONFIG_IDX) + "GCPadNew.ini";
++  if (File::Exists(config_path) && File::GetSize(config_path) != 0)
+     return;
+ 
+   auto* pad = s_config.GetController(0);

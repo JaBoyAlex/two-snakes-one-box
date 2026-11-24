@@ -50,6 +50,12 @@ The tester subsequently reported gameplay drops. Thirteen nearby live samples ra
 
 A private x64 trial linked fallback JIT blocks directly when the destination could not belong to the fixed native module. The dispatcher still checks destinations inside native code ranges. In the first matched headless replay of the new checkpoint, the reference measured `0.837` median speed and `0.780` minimum speed. The trial measured `1.000` median and `0.999` minimum. Both runs completed 21 samples, recorded native dispatches, and shut down normally. Repeat runs and windowed gameplay are pending.
 
+During a subsequent windowed test of the x64 trial, the tester reported a recurring slowdown in another area and saved a checkpoint there. In 24 nearby samples, the title displayed 53.3–62.4 FPS and game speed as low as 86%. The busiest runtime thread averaged 98.9% of one logical CPU. Nine samples put 3D GPU engine usage between 9.1% and 18.9%. Replaying this checkpoint with output disabled and with offscreen Vulkan can test whether the remaining slowdown requires the renderer.
+
+Replaying the new checkpoint with output disabled measured `0.837` median speed for the reference and `0.998` with fallback linking enabled. The linked build's minimum was `0.956`. With offscreen Vulkan and the same linked build, the median was `0.921` and the minimum was `0.813`. These runs collected 28–29 samples each and shut down normally. The renderer adds enough work in this checkpoint to reproduce part of the live slowdown.
+
+The same Vulkan replay reached `1.000` median speed with separate CPU and video threads. The first 29 samples had a minimum of `0.955`. The full 49-sample run dipped to `0.909` and exited normally. The thread names confirmed that the setting took effect. The separate threads are available in an isolated test profile for live validation.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
