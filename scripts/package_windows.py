@@ -20,6 +20,8 @@ def main():
     parser.add_argument('--tools', type=Path, required=True, help='Directory holding python, cmake, ninja and llvm-mingw')
     parser.add_argument('--vc-runtime-dir', type=Path, help='Visual Studio x64 Microsoft.VC143.CRT directory')
     parser.add_argument('--output', type=Path, default=ROOT / 'dist')
+    parser.add_argument('--staging-root', type=Path, default=ROOT / '.local/packages',
+                        help='Directory where the versioned build folder is staged')
     parser.add_argument('--version', default='0.1.0-dev')
     parser.add_argument('--stage-only', action='store_true',
                         help='Prepare a local RecompLauncher build folder without creating an archive')
@@ -37,7 +39,7 @@ def main():
                      args.tools / 'llvm-mingw/bin/clang.exe']:
         if not required.is_file():
             raise SystemExit(f'Missing package input: {required}')
-    stage = ROOT / '.local/packages' / args.version
+    stage = args.staging_root.resolve() / args.version
     if stage.exists():
         raise SystemExit('Use a new package version or remove the old staging directory after reviewing it.')
     stage.mkdir(parents=True)

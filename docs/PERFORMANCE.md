@@ -86,6 +86,18 @@ In a later interactive test at 4× fullscreen, the tester reported slow motion. 
 
 After the tester reported minimizing and restoring, Windows reported a maximized window with a menu and a 2556 × 1345 client area on the 2560 × 1440 desktop. The profile still requested 1×. The renderer recalculates the internal scale on resize only in its automatic scale mode. This observation verifies the smaller presentation area. A controlled minimize and restore is needed to identify how fullscreen was left. A new local save state from this session is available for matched replays.
 
+Three controlled minimize and restore cycles on the same display retained the exact 2560 × 1440 fullscreen client area at 4× internal scale. This test used the Windows minimize command and restore API. The earlier transition to a maximized window remains unexplained.
+
+At the new F1 checkpoint, the display runner reached 79.7% median speed with graphics and audio disabled. The JIT reference reached 100.0% under the same conditions. The display runner was missing the earlier fallback block-linking change. Rebuilding with that change produced the following results over the same eight-second span, using separate CPU and video threads and 33 game-speed samples per run.
+
+| Test | Before linking | With linking | Render interval at the 95th percentile |
+| --- | ---: | ---: | ---: |
+| Graphics and audio disabled | 79.7% | 98.6% | — |
+| Vulkan fullscreen at 1× | 82.1% | 95.0% | 23.54 → 20.32 ms |
+| Vulkan fullscreen at 4× | 82.6% | 98.6% | 23.00 → 19.36 ms |
+
+The rebuilt runner exited normally in each replay and in a cold Disc 1 boot at 100% median speed. The 1× run still had a 137 ms render interval. These brief runs identify a CPU improvement. Repeat across longer replays before drawing conclusions about scale or worst-case pacing.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.

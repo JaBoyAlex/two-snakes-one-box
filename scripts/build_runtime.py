@@ -43,6 +43,7 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-win32-fullscreen.patch',
                 after=('recompcore-win32-window-teardown.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-fastmem.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-linking.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-verified-virtual-code.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-headless-shader-progress.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-disc-mount-log.patch')

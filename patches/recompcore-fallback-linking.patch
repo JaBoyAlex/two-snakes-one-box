@@ -1,0 +1,87 @@
+diff --git a/Source/Core/Core/PowerPC/Jit64/Jit_Compile.cpp b/Source/Core/Core/PowerPC/Jit64/Jit_Compile.cpp
+--- a/Source/Core/Core/PowerPC/Jit64/Jit_Compile.cpp
++++ b/Source/Core/Core/PowerPC/Jit64/Jit_Compile.cpp
+@@ -42,6 +42,7 @@
+ #include "Core/PowerPC/MMU.h"
+ #include "Core/PowerPC/PPCAnalyst.h"
+ #include "Core/PowerPC/PowerPC.h"
++#include "Core/PowerPC/StaticRecomp/StaticRecompCore.h"
+ #include "Core/System.h"
+ 
+ using namespace Gen;
+@@ -581,9 +582,10 @@
+ 
+ void Jit64::EnableBlockLink()
+ {
+-  jo.enableBlocklink = true;
+-  if (SConfig::GetInstance().bJITNoBlockLinking || IsStaticRecompFallback())
+-    jo.enableBlocklink = false;
++  jo.enableBlocklink =
++      !SConfig::GetInstance().bJITNoBlockLinking &&
++      (!IsStaticRecompFallback() ||
++       (g_static_recomp_core && g_static_recomp_core->AllowsFallbackBlockLinking()));
+ }
+ 
+ void Jit64::EnableOptimization()
+diff --git a/Source/Core/Core/PowerPC/JitCommon/JitBase.cpp b/Source/Core/Core/PowerPC/JitCommon/JitBase.cpp
+--- a/Source/Core/Core/PowerPC/JitCommon/JitBase.cpp
++++ b/Source/Core/Core/PowerPC/JitCommon/JitBase.cpp
+@@ -181,7 +181,8 @@
+ void JitBase::InitBLROptimization()
+ {
+   m_enable_blr_optimization =
+-      jo.enableBlocklink && !IsDebuggingEnabled() && EMM::IsExceptionHandlerSupported();
++      jo.enableBlocklink && !IsStaticRecompFallback() && !IsDebuggingEnabled() &&
++      EMM::IsExceptionHandlerSupported();
+   m_cleanup_after_stackfault = false;
+ }
+ 
+diff --git a/Source/Core/Core/PowerPC/JitCommon/JitCache.cpp b/Source/Core/Core/PowerPC/JitCommon/JitCache.cpp
+--- a/Source/Core/Core/PowerPC/JitCommon/JitCache.cpp
++++ b/Source/Core/Core/PowerPC/JitCommon/JitCache.cpp
+@@ -447,6 +447,9 @@
+ {
+   for (auto& e : block.linkData)
+   {
++    if (m_jit.IsStaticRecompFallback() &&
++        (!g_static_recomp_core || !g_static_recomp_core->CanLinkFallbackTo(e.exitAddress)))
++      continue;
+     if (g_static_recomp_core && g_static_recomp_core->IsHostCallAddress(e.exitAddress))
+       continue;
+     if (!e.linkStatus)
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
+@@ -134,6 +134,20 @@
+   if (m_module_active && DispatchableAt(address))
+     return true;
+   return IsHostCallAddress(address);
++}
++
++bool StaticRecompCore::AllowsFallbackBlockLinking() const
++{
++  return m_module && !m_has_rel_modules && !m_guest.host_call &&
++         !m_module_source.host_call_contains && m_forced_fallback_ranges.empty();
++}
++
++bool StaticRecompCore::CanLinkFallbackTo(u32 address) const
++{
++  // A linked exit bypasses the core's dispatcher. Keep that boundary for
++  // every destination the native module could cover after verification.
++  return AllowsFallbackBlockLinking() &&
++         !AddressIsCovered(m_module->code_ranges, m_module->num_code_ranges, address);
+ }
+ 
+ StaticRecompCore::StaticRecompCore(Core::System& system, StaticRecompModuleSource module_source)
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
+@@ -55,6 +55,8 @@
+   bool FastDispatchableAt(u32 address);
+   bool IsHostCallAddress(u32 address) const;
+   bool ShouldYieldAt(u32 address);
++  bool AllowsFallbackBlockLinking() const;
++  bool CanLinkFallbackTo(u32 address) const;
+ 
+   void ClearCache() override;
+   void Jit(u32 em_address) override {}
