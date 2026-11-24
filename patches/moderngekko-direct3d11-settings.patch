@@ -1,0 +1,54 @@
+diff --git a/tools/frontend_config.cpp b/tools/frontend_config.cpp
+--- a/tools/frontend_config.cpp
++++ b/tools/frontend_config.cpp
+@@ -39,6 +39,10 @@ std::string NormalizeGraphicsBackend(std::string value) {
+     return "Vulkan";
+   if (lower == "opengl" || lower == "ogl")
+     return "OGL";
++#ifdef _WIN32
++  if (lower == "d3d")
++    return "D3D";
++#endif
+   return {};
+ }
+ 
+@@ -89,6 +93,9 @@ const std::vector<GraphicsBackendOption> &SupportedGraphicsBackends() {
+   static const std::vector<GraphicsBackendOption> backends = {
+       {"Vulkan", "Vulkan"},
+       {"OpenGL", "OGL"},
++#ifdef _WIN32
++      {"Direct3D 11", "D3D"},
++#endif
+   };
+   return backends;
+ }
+@@ -125,7 +132,7 @@ ConfigResult LoadConfig(const fs::path &user_directory,
+     else if (key == "backend" || key == "graphics_backend") {
+       config.graphics_backend = NormalizeGraphicsBackend(raw_value);
+       if (config.graphics_backend.empty())
+-        return {.error = "graphics backend must be Vulkan or OpenGL"};
++        return {.error = "unsupported graphics backend '" + raw_value + "'"};
+     }
+     else if (key == "controller")
+       config.controller = raw_value;
+diff --git a/tests/frontend_config_test.cpp b/tests/frontend_config_test.cpp
+--- a/tests/frontend_config_test.cpp
++++ b/tests/frontend_config_test.cpp
+@@ -68,6 +68,17 @@ int main() {
+   invalid_netplay.graphics_backend = "Direct3D 9";
+   if (moderngekko::frontend::SaveConfig(directory, invalid_netplay, &error))
+     return 13;
++
++  auto direct3d_config = netplay_config;
++  direct3d_config.graphics_backend = "D3D";
++#ifdef _WIN32
++  if (!moderngekko::frontend::SaveConfig(directory, direct3d_config, &error) ||
++      moderngekko::frontend::LoadConfig(directory, false).graphics_backend != "D3D")
++    return 14;
++#else
++  if (moderngekko::frontend::SaveConfig(directory, direct3d_config, &error))
++    return 14;
++#endif
+   if (!moderngekko::frontend::GenerateControllerConfig(
+           directory, netplay_config.controllers, &error))
+     return 3;

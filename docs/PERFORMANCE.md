@@ -40,6 +40,8 @@ python scripts/benchmark_boot.py --data .local/player --runner .local/runtime/mo
 
 Use an idle machine and the same disc and scene for comparisons. Pass `--disc 2 --load-state PATH` for a checkpoint captured on Disc 2. The default headless run isolates the CPU path. `--offscreen Vulkan` (also `--offscreen-vulkan`) exercises rendering without a visible window or audio. `--windowed` adds display presentation and normal audio with Vulkan by default. Pass `D3D` for Direct3D 11 or `D3D12` for Direct3D 12 to either option. `--dual-core` enables separate CPU and video threads in the isolated benchmark profile. Add `--frame-times` to a windowed run for median, 95th-percentile and maximum render and vertical blank intervals after warmup. The runtime render counter includes repeated presents when they are enabled. These intervals measure runtime events. Use OS-level tracing to measure when frames reach the display. Generated outputs, logs and capture files stay local.
 
+The benchmark reports startup time from process launch to the first poll that observes a running core and an advanced frame counter. Use this measurement alongside the steady-state replay when comparing shader warmup or video backends.
+
 Use `--compare-threading` to run shared and separate CPU/video threads in both orders against the same runner and checkpoint. It defaults to hybrid execution. With `--shader-cache-seed PATH`, every run starts with its own copy of the supplied local `Cache` directory. Seed from a completed run with the same backend and GPU so each case starts with the same pipeline data.
 
 Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay. Benchmark profiles and logs default to a subdirectory of the system temporary directory. Use `--output PATH` to retain traces elsewhere. One run in a synced workspace failed to replace the test profile's filesystem metadata (`IOS_FS: Failed to rename temporary FST file`). Repeat runs with isolated profiles outside the synced workspace completed successfully.
@@ -350,6 +352,20 @@ Five 75-second Tower A diagnostic replays used the current runtime, a warm Vulka
 In the first two runs, 47 of 202 snapshots during the traced gaps showed the thread ready to run. Outside those gaps, 155 of 58,983 snapshots showed the thread ready. None of the long gaps overlapped a traced Vulkan wait, shader compile, cache reset or throttle oversleep. This supports a scheduling contribution to some hitches. The snapshots cannot establish how long each scheduling delay lasted, and the 56 ms gap from the earlier packaged run did not recur in this diagnostic series.
 
 Both above-normal trials had shorter maximum VBlank intervals than the first two normal runs. The final normal control was within 1.33 ms of the shortest maximum and had the fewest speed drops. The release profile uses normal priority. A priority change needs validation under sustained mixed workloads and on another Windows system.
+
+### Dev.20 Tower A graphics backends
+
+Three 75-second replays used dev.20, the same Disc 2 Tower A alarm state, shared CPU and video threads, a 4× window and Cubeb audio. The Intel i5-11400 and GeForce RTX 3060 Ti ran each backend with a populated shader cache. All three runs completed at 100% median game speed and shut down normally.
+
+| Backend | Speed p05 | Lowest speed sample | Samples below 95% | Render interval p95 | Longest VBlank interval |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Vulkan | 98.1% | 81.4% | 7 of 301 | 22.11 ms | 43.74 ms |
+| Direct3D 11 | 99.6% | 97.3% | 0 of 301 | 17.58 ms | 34.19 ms |
+| Direct3D 12 | 99.7% | 96.6% | 0 of 301 | 17.37 ms | 25.88 ms |
+
+The 25-second cache-building replays also reached 100% median game speed with zero samples below 95% on both Direct3D backends. Those sampling windows began after startup. Warm Direct3D 12 reached the first observed running frame in 25.81 seconds. These results cover one checkpoint on one graphics card.
+
+The dev.21 Direct3D 11 setting also passed two 22-second windowed replays at 4× with Cubeb and a warm shader cache. The Disc 1 Underground Passage flashback reached 100.0% median and 96.9% minimum game speed. The Disc 2 Hind fight reached 100.1% median and 99.7% minimum. Windows loopback reported zero packet discontinuities and zero gaps over 2 ms among packets with valid timestamps in both captures. Both runs shut down normally.
 
 ## Tool comparisons
 

@@ -93,8 +93,8 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
         command += ['--load-state', str(load_state)]
 
     with (work / 'runtime.log').open('wb') as log:
-        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=env)
         start = time.monotonic()
+        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=env)
         began_sampling = None
         previous_sample = None
         samples = []
@@ -148,6 +148,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
 
     summary = {'cpu': mode, 'graphics': backend, 'headless': not windowed, 'exit_code': process.returncode,
                'completed': completed, 'forced_stop': forced_stop,
+               'startup_seconds': round(began_sampling - start, 2) if began_sampling is not None else None,
                'sample_count': len(samples), 'samples': samples,
                'internal_scale_requested': internal_scale, 'fullscreen_requested': fullscreen}
     if dual_core is not None:

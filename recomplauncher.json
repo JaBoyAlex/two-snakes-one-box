@@ -194,6 +194,12 @@
           "set": {
             "backend": "OpenGL"
           }
+        },
+        {
+          "label": "Direct3D 11",
+          "set": {
+            "backend": "D3D"
+          }
         }
       ]
     },

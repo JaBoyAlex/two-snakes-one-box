@@ -37,6 +37,7 @@ def main():
     apply_patch(source, 'moderngekko-no-empty-mod-hooks.patch')
     apply_patch(source, 'moderngekko-disc-pair.patch')
     apply_patch(source, 'moderngekko-automatic-display.patch')
+    apply_patch(source, 'moderngekko-direct3d11-settings.patch')
     apply_patch(source, 'moderngekko-title-game-speed.patch')
     apply_patch(source, 'moderngekko-windows-utf8-paths.patch')
     apply_patch(source, 'moderngekko-create-shader-cache.patch')
