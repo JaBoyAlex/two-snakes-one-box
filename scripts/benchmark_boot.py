@@ -1,4 +1,4 @@
-"""Benchmark CPU modes and native modules with isolated runtime settings."""
+"""Benchmark CPU modes, runners and native modules with isolated runtime settings."""
 import argparse
 import json
 import math
@@ -36,7 +36,19 @@ def summarize_intervals(path, start, end):
     intervals.sort()
     return {'count': len(intervals), 'median': round(statistics.median(intervals), 3),
             'p95': round(intervals[math.ceil(len(intervals) * 0.95) - 1], 3),
-            'maximum': round(intervals[-1], 3)}
+            'maximum': round(intervals[-1], 3),
+            'intervals_over_50ms': sum(interval > 50 for interval in intervals)}
+
+
+def summarize_speed(speeds):
+    ordered = sorted(speeds)
+    if not ordered:
+        return {}
+    return {'median_speed': round(statistics.median(ordered), 3),
+            'minimum_speed': round(ordered[0], 3),
+            'maximum_speed': round(ordered[-1], 3),
+            'speed_p05': round(ordered[math.ceil(len(ordered) * 0.05) - 1], 3),
+            'samples_below_95_percent': sum(speed < 0.95 for speed in ordered)}
 
 
 def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load_state, dispatch_samples,
@@ -100,7 +112,8 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                 except (OSError, ValueError, KeyError):
                     continue
                 now = time.monotonic()
-                if state.get('booted') != '1' or state.get('state') != 'running' or not frame:
+                if (state.get('booted') != '1' or state.get('state') != 'running' or not frame
+                        or not math.isfinite(speed)):
                     continue
                 if began_sampling is None:
                     began_sampling = now
@@ -142,11 +155,10 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
             for name, path in interval_logs.items()
         }
     if samples:
-        metrics = ['speed', 'drawn_fps', 'vps', 'fps'] if windowed else ['speed', 'drawn_fps']
+        metrics = ['drawn_fps', 'vps', 'fps'] if windowed else ['drawn_fps']
         summary.update({f'median_{key}': round(statistics.median(sample[key] for sample in samples), 3)
                         for key in metrics})
-        summary['minimum_speed'] = round(min(sample['speed'] for sample in samples), 3)
-        summary['maximum_speed'] = round(max(sample['speed'] for sample in samples), 3)
+        summary.update(summarize_speed(sample['speed'] for sample in samples))
     (work / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     print(json.dumps({key: value for key, value in summary.items() if key != 'samples'}), flush=True)
     return process.returncode == 0 and completed and not forced_stop and bool(samples)
@@ -157,8 +169,11 @@ def main():
     parser.add_argument('--data', required=True, type=Path)
     parser.add_argument('--runner', required=True, type=Path)
     parser.add_argument('--module', type=Path, help='Test a candidate module instead of the prepared module')
-    parser.add_argument('--compare-module', type=Path,
-                        help='Compare a candidate against --module or the prepared module in both run orders')
+    comparison = parser.add_mutually_exclusive_group()
+    comparison.add_argument('--compare-module', type=Path,
+                            help='Compare a candidate against --module or the prepared module in both run orders')
+    comparison.add_argument('--compare-runner', type=Path,
+                            help='Compare a candidate against --runner in both run orders')
     parser.add_argument('--disc', type=int, choices=[1, 2], default=1,
                         help='Boot the selected prepared disc (default: 1)')
     parser.add_argument('--load-state', type=Path, help='Replay a local save state for the selected disc')
@@ -172,7 +187,7 @@ def main():
                         help='Integer EFB render scale in the isolated profile, from 1 to 12 (default: 1)')
     parser.add_argument('--fullscreen', action='store_true', help='Start the windowed benchmark in borderless fullscreen')
     parser.add_argument('--mode', choices=['aot', 'jit', 'both'],
-                        help='Default: both, or aot for --compare-module')
+                        help='Default: both, or aot when comparing runners or modules')
     display = parser.add_mutually_exclusive_group()
     backends = ['Vulkan', 'D3D', 'D3D12']
     display.add_argument('--windowed', nargs='?', const='Vulkan', choices=backends,
@@ -188,6 +203,8 @@ def main():
         parser.error('--internal-scale must be between 1 and 12')
     if args.compare_module and args.mode not in (None, 'aot'):
         parser.error('--compare-module requires AOT mode')
+    if args.compare_runner and args.mode == 'both':
+        parser.error('--compare-runner requires a single CPU mode')
     windowed = args.windowed is not None
     if args.frame_times and not windowed:
         parser.error('--frame-times requires --windowed')
@@ -207,17 +224,21 @@ def main():
     work = (args.output.resolve() / str(time.time_ns()) if args.output else
             Path(tempfile.mkdtemp(prefix='TwinSnakesRecompBenchmark-')))
     backend = args.windowed or args.offscreen or 'Null'
-    if args.compare_module:
-        candidate = args.compare_module.resolve(strict=True)
-        cases = [('reference-first', 'aot', module), ('candidate-second', 'aot', candidate),
-                 ('candidate-first', 'aot', candidate), ('reference-second', 'aot', module)]
+    if args.compare_module or args.compare_runner:
+        mode = args.mode or 'aot'
+        candidate_module = args.compare_module.resolve(strict=True) if args.compare_module else module
+        candidate_runner = args.compare_runner.resolve(strict=True) if args.compare_runner else runner
+        cases = [('reference-first', mode, runner, module),
+                 ('candidate-second', mode, candidate_runner, candidate_module),
+                 ('candidate-first', mode, candidate_runner, candidate_module),
+                 ('reference-second', mode, runner, module)]
     else:
         modes = ['jit', 'aot'] if args.mode in (None, 'both') else [args.mode]
-        cases = [(mode, mode, module) for mode in modes]
+        cases = [(mode, mode, runner, module) for mode in modes]
     outcomes = []
-    for label, mode, selected_module in cases:
+    for label, mode, selected_runner, selected_module in cases:
         print(f'Running {label}', flush=True)
-        outcomes.append(benchmark(mode, runner, data / disc['root'], selected_module,
+        outcomes.append(benchmark(mode, selected_runner, data / disc['root'], selected_module,
                                   work / label, windowed, backend, args.seconds,
                                   load_state, args.dispatch_samples, dual_core=args.dual_core,
                                   frame_times=args.frame_times, internal_scale=args.internal_scale,

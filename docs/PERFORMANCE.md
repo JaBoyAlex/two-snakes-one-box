@@ -44,7 +44,9 @@ Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to c
 
 To compare display settings, use `--windowed Vulkan --fullscreen --frame-times` and repeat the same checkpoint with `--internal-scale 1` and `--internal-scale 4`. Fullscreen sets the presentation surface to the current monitor's desktop size. Internal scale controls the GameCube render targets independently. The Windows test runtime opened directly with a 2560 × 1440 client area, restored its windowed geometry, and returned to a 2560 × 1440 client area. Other monitors, DPI settings, HUD placement, and graphics effects remain to be checked.
 
-Use `--compare-module PATH` to compare a native module against the prepared module on the same runner. Add `--module PATH` to supply a different reference. The benchmark runs reference, candidate, candidate, reference in separate profiles to expose run-order effects. A run that exits before the requested sampling window ends is marked incomplete even if it exits normally.
+Use `--compare-module PATH` to compare a native module against the prepared module on the same runner. Add `--module PATH` to supply a different reference. Use `--compare-runner PATH` to compare two runtime executables with the same module. Both comparisons run reference, candidate, candidate, reference in separate profiles. A run that exits before the requested sampling window ends is marked incomplete even if it exits normally.
+
+The summary includes the speed at the fifth percentile and the number of samples below 95% of the original game speed. With `--frame-times`, it also counts render and vertical blank intervals longer than 50 ms. A held scene can suppress duplicate presents while the game clock and vertical blanks continue normally.
 
 Use a regular windowed launch for physical controller checks. `--automation-dir` installs scripted input overrides, including when it is added only to capture timing. During a manual test the launcher detected the XInput pad and assigned it to port 1 after resuming the saved session without those overrides. The tester confirmed that the controller responded, reported around 30 FPS in the replayed cutscene, and saw around 50 FPS in the first 15 seconds of gameplay. The game clock was unavailable in the window title on that build.
 
@@ -196,6 +198,23 @@ Two alternating comparisons used the normal shared-thread window at 4× Vulkan w
 Both patched runs reached near-normal median speed. Their speed floors still varied across runs. All four runs recorded 20 native chunk verifications, six invalidations that marked chunks for revalidation, and the same single guest-code hash mismatch.
 
 The patched Hind fight replay reached 100.0% median game speed and a 99.5% minimum in the same windowed configuration. A separate Tower A capture with DSP dumping and an 80 ms audio buffer recorded 17.99 seconds of Cubeb output with zero packet discontinuities. That instrumented run reached 96.3% median game speed and dipped to 83.1%.
+
+### Sustained dev.16 replays
+
+The packaged runtime replayed the Heliport checkpoint on Disc 1 for 75 seconds and the Tower A alarm checkpoint on Disc 2 for 90 seconds per configuration. Each run used a 4× Vulkan window and Cubeb with the default 80 ms audio buffer. DSP dumping was off. The checkpoints ran with neutral scripted input. All four runs exited normally and Windows loopback recorded zero packet discontinuities.
+
+| Scene and CPU setting | Median game speed | Speed p05 | Lowest speed sample | Render interval p95 | Longest render interval | Longest vertical blank interval |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Heliport, hybrid shared | 100.0% | 100.0% | 98.0% | 17.37 ms | 25.37 ms | 25.01 ms |
+| Tower A, hybrid shared | 96.3% | 89.2% | 71.9% | 20.38 ms | 476.26 ms | 48.85 ms |
+| Tower A, hybrid separate | 100.0% | 97.8% | 92.1% | 18.08 ms | 483.82 ms | 42.07 ms |
+| Tower A, JIT shared | 100.0% | 100.0% | 99.5% | 17.23 ms | 492.66 ms | 28.04 ms |
+
+The Tower A JIT replay reached the Continue screen. The first 3,600 reported frame advances, before the late transition, took 63.21 seconds with shared-thread hybrid execution, 60.21 seconds with separate threads, and 60.19 seconds with JIT. The shared-thread hybrid recorded 84 of 251 samples below 95% game speed during that prefix. The separate-thread hybrid recorded six of 240, and JIT recorded zero of 239. The game-speed drops occur during gameplay with both the scene and output settings matched.
+
+The half-second render gap occurred in all three Tower A configurations. A matched JIT repeat with duplicate framebuffer presentation enabled recorded 5,412 render intervals and 5,412 vertical blank intervals. The longest render interval fell from 492.66 ms to 32.74 ms, with game speed at 100.0% median in both runs. Windows loopback again recorded zero packet discontinuities. The large gap measures duplicate framebuffer suppression during the transition.
+
+A separate host capture started 32.5 seconds into the Tower A replay at 92.6% sampled game speed. Of 768 instruction-pointer samples on the busiest thread, 237 landed in the compiled boot module. Named runtime functions included the native run loop (67), instruction fallback (38), and two register-state synchronization functions (40 combined). Use these counts to target generated code and transitions between CPU paths. The sampler paused the CPU thread to collect each instruction pointer.
 
 ## Tool comparisons
 
