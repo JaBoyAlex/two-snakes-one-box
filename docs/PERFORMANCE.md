@@ -168,6 +168,17 @@ The module linked against the SDK from a fresh runtime staging run. On the same 
 
 The pinned runtime derives game speed from emulated CPU ticks and wall time. `VideoInterface` counts vertical blanks, and `Core::Callback_FramePresented` counts host presentations, including repeated frames when enabled. The audio interface schedules samples using the emulated CPU clock. To measure game work directly, a private JIT probe recorded function entries and indirect calls against emulated CPU ticks. The task scheduler ran at a median 29.95 Hz over 346 passes in a dialogue replay and 59.96 Hz over 677 passes in gameplay. These passes dispatched 53 and 115 distinct callbacks, respectively. Both replays maintained the original guest clock. Map camera, animation, and draw callbacks before changing their rates. [PAL task scheduler analysis](https://github.com/alphanu1/msg-twinsnakes-recomp/blob/d1fbfec2281042d2eaef43dbb20afedb0ae1d364/config/symbols/mgso_pal.rel.symbols.txt)
 
+PowerPC instruction fingerprints identified the matching SDK routines in the USA executable. A JIT probe measured their median call intervals in an in-engine dialogue scene and in dock gameplay, using emulated ticks with offscreen Vulkan. Both runs completed at 100% median game speed.
+
+| Guest operation | Dialogue | Dock gameplay |
+| --- | ---: | ---: |
+| `GXCopyDisp` copies the rendered framebuffer | 29.95 Hz | 59.95 Hz |
+| `VISetNextFrameBuffer` submits the buffer to the video interface | 29.97 Hz | 59.94 Hz |
+| `PADRead` reads controller state | 59.94 Hz | 59.94 Hz |
+| The traced engine viewport call sets up the draw | 29.97 Hz | 59.93 Hz |
+
+The same engine viewport call site tracked the display-copy cadence in both scenes. The probe also saw multiple perspective and orthographic projection uploads per displayed frame. The camera and animation code that produces the transforms still needs tracing. [PAL SDK symbol reference](https://github.com/alphanu1/msg-twinsnakes-recomp/blob/d1fbfec2281042d2eaef43dbb20afedb0ae1d364/config/symbols/main.dol.symbols.txt)
+
 Prototype rendering directly from camera and animation evaluated at the presentation cadence, where the game's data supports it. Start with a known gameplay replay and an in-engine dialogue scene. Keep the original physics and script update schedule and audio clock, and verify motion, camera cuts, and dialogue timing with repeatable input. A higher simulation rate would require validating each frame-dependent update and callback. Keep the original guest speed limit during these experiments.
 
 The opening sequence showed about 30 rendered frames per second and 60 video updates per second in an earlier capture. Static references and a relocated function pointer identified the USA movie task on both discs. The opening playback trace recorded 322 calls with a median interval of 33.367 ms. Neither the dialogue nor the gameplay replay called this task. That interval measures the task cadence. Decoder output timestamps and dialogue sync still need verification before evaluating optional video smoothing. [PAL movie task symbols](https://github.com/alphanu1/msg-twinsnakes-recomp/blob/d1fbfec2281042d2eaef43dbb20afedb0ae1d364/config/symbols/mgso_pal.rel.symbols.txt)
