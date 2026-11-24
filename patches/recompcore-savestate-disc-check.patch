@@ -1,0 +1,189 @@
+diff --git a/Source/Core/Core/HW/DVD/DVDThread.h b/Source/Core/Core/HW/DVD/DVDThread.h
+--- a/Source/Core/Core/HW/DVD/DVDThread.h
++++ b/Source/Core/Core/HW/DVD/DVDThread.h
+@@ -64,6 +64,7 @@
+ 
+   void SetDisc(std::unique_ptr<DiscIO::Volume> disc);
+   bool HasDisc() const;
++  std::optional<u8> GetDiscNumber();
+ 
+   bool HasWiiHashes() const;
+   DiscIO::Platform GetDiscType() const;
+diff --git a/Source/Core/Core/HW/DVD/DVDThread.cpp b/Source/Core/Core/HW/DVD/DVDThread.cpp
+--- a/Source/Core/Core/HW/DVD/DVDThread.cpp
++++ b/Source/Core/Core/HW/DVD/DVDThread.cpp
+@@ -109,6 +109,12 @@
+ bool DVDThread::HasDisc() const
+ {
+   return m_disc != nullptr;
++}
++
++std::optional<u8> DVDThread::GetDiscNumber()
++{
++  WaitUntilIdle();
++  return m_disc ? m_disc->GetDiscNumber() : std::nullopt;
+ }
+ 
+ bool DVDThread::HasWiiHashes() const
+diff --git a/Source/Core/Core/StateFile.h b/Source/Core/Core/StateFile.h
+--- a/Source/Core/Core/StateFile.h
++++ b/Source/Core/Core/StateFile.h
+@@ -4,6 +4,7 @@
+ #pragma once
+ 
+ #include <string>
++#include <string_view>
+ #include <vector>
+ #include <span>
+ #include <optional>
+@@ -16,6 +17,7 @@
+ namespace State
+ {
+ extern Common::TransferableSharedMutex s_state_saves_in_progress;
++inline constexpr std::string_view TWIN_SNAKES_GAME_ID = "GGSEA4";
+ // Don't forget to increase this after doing changes on the savestate system
+ constexpr u32 STATE_VERSION = 191;  // Last changed in PR 14668
+ 
+@@ -48,10 +50,11 @@
+ bool ValidateHeaders(const StateHeader& header);
+ bool ReadHeader(const std::string& filename, StateHeader& header);
+ bool DecompressLZ4(Common::UniqueBuffer<u8>& raw_buffer, u64 size, File::IOFile& f);
+-void LoadFileStateData(const std::string& filename, Common::UniqueBuffer<u8>& ret_data);
++void LoadFileStateData(const std::string& filename, Common::UniqueBuffer<u8>& ret_data,
++                       u8 mounted_twin_snakes_disc);
+ void CompressBufferToFile(std::span<const u8> raw_buffer, File::IOFile& f);
+ void CreateExtendedHeader(StateExtendedHeader& extended_header, size_t uncompressed_size);
+-void WriteHeadersToFile(size_t uncompressed_size, File::IOFile& f);
++void WriteHeadersToFile(size_t uncompressed_size, File::IOFile& f, u8 twin_snakes_disc);
+ 
+ double GetSystemTimeAsDouble();
+ std::string SystemTimeAsDoubleToString(double time);
+diff --git a/Source/Core/Core/StateFile.cpp b/Source/Core/Core/StateFile.cpp
+--- a/Source/Core/Core/StateFile.cpp
++++ b/Source/Core/Core/StateFile.cpp
+@@ -4,6 +4,7 @@
+ #include "Core/StateFile.h"
+ 
+ #include <algorithm>
++#include <array>
+ #include <filesystem>
+ #include <locale>
+ #include <map>
+@@ -38,6 +39,8 @@
+ 
+ namespace State
+ {
++// Legacy modern-state writers zero these reserved bytes. The tag leaves the payload layout intact.
++constexpr std::array<char, 3> TWIN_SNAKES_DISC_TAG{'T', 'S', 'D'};
+ 
+ #if defined(__LZO_STRICT_16BIT)
+ static const u32 IN_LEN = 8 * 1024u;
+@@ -308,7 +311,8 @@
+   return true;
+ }
+ 
+-void LoadFileStateData(const std::string& filename, Common::UniqueBuffer<u8>& ret_data)
++void LoadFileStateData(const std::string& filename, Common::UniqueBuffer<u8>& ret_data,
++                       u8 mounted_twin_snakes_disc)
+ {
+   File::IOFile f;
+   f.Open(filename, "rb");
+@@ -316,6 +320,19 @@
+   StateHeader header;
+   if (!ReadStateHeaderFromFile(header, f) || !ValidateHeaders(header))
+     return;
++
++  const auto& legacy = header.legacy_header;
++  const auto required_disc = static_cast<u8>(legacy.reserved2[3]);
++  if (std::string_view(legacy.game_id, sizeof(legacy.game_id)) == TWIN_SNAKES_GAME_ID &&
++      std::ranges::equal(TWIN_SNAKES_DISC_TAG, std::span(legacy.reserved2).first<3>()) &&
++      (required_disc == 1 || required_disc == 2) && required_disc != mounted_twin_snakes_disc)
++  {
++    const auto message = fmt::format("This Twin Snakes save state requires Disc {} to be mounted.",
++                                     required_disc);
++    WARN_LOG_FMT(CORE, "{}", message);
++    Core::DisplayMessage(message, OSD::Duration::NORMAL);
++    return;
++  }
+ 
+   StateExtendedHeader extended_header;
+   if (!f.ReadArray(&extended_header.base_header, 1))
+@@ -413,12 +430,17 @@
+   base_header.uncompressed_size = uncompressed_size;
+ }
+ 
+-void WriteHeadersToFile(size_t uncompressed_size, File::IOFile& f)
++void WriteHeadersToFile(size_t uncompressed_size, File::IOFile& f, u8 twin_snakes_disc)
+ {
+   StateHeader header{};
+   SConfig::GetInstance().GetGameID().copy(header.legacy_header.game_id,
+                                           std::size(header.legacy_header.game_id));
+   header.legacy_header.time = GetSystemTimeAsDouble();
++  if (twin_snakes_disc != 0)
++  {
++    std::ranges::copy(TWIN_SNAKES_DISC_TAG, header.legacy_header.reserved2);
++    header.legacy_header.reserved2[3] = static_cast<char>(twin_snakes_disc);
++  }
+ 
+   header.version_header.version_cookie = COOKIE_BASE + STATE_VERSION;
+   header.version_string = Common::GetScmRevStr();
+diff --git a/Source/Core/Core/State.cpp b/Source/Core/Core/State.cpp
+--- a/Source/Core/Core/State.cpp
++++ b/Source/Core/Core/State.cpp
+@@ -37,6 +37,7 @@
+ #include "Core/Core.h"
+ #include "Core/CoreTiming.h"
+ #include "Core/Cheats/GeckoCode.h"
++#include "Core/HW/DVD/DVDThread.h"
+ #include "Core/HW/HW.h"
+ #include "Core/HW/Memmap.h"
+ #include "Core/HW/Wiimote.h"
+@@ -74,6 +75,7 @@
+ {
+   Common::UniqueBuffer<u8> buffer;
+   std::string filename;
++  u8 twin_snakes_disc;
+   std::shared_lock<decltype(s_state_saves_in_progress)> task_lock;
+ };
+ 
+@@ -212,6 +214,14 @@
+   return 0;
+ }
+ 
++static u8 GetMountedTwinSnakesDisc(Core::System& system)
++{
++  if (SConfig::GetInstance().GetGameID() != TWIN_SNAKES_GAME_ID)
++    return 0;
++  const auto disc = system.GetDVDThread().GetDiscNumber();
++  return disc && *disc < 2 ? *disc + 1 : 0;
++}
++
+ static void CompressAndDumpState(Core::System& system, const CompressAndDumpStateArgs& save_args)
+ {
+   const auto& buffer = save_args.buffer;
+@@ -233,7 +243,7 @@
+     return;
+   }
+ 
+-  WriteHeadersToFile(buffer.size(), f);
++  WriteHeadersToFile(buffer.size(), f, save_args.twin_snakes_disc);
+ 
+   if (s_use_compression)
+     CompressBufferToFile(buffer, f);
+@@ -299,6 +309,7 @@
+     CompressAndDumpStateArgs dump_args{
+         .buffer = std::move(buffer),
+         .filename = std::move(filename),
++        .twin_snakes_disc = GetMountedTwinSnakesDisc(system),
+         .task_lock = GetStateSaveTaskLock(),
+     };
+     Core::DisplayMessage("Saving State...", 1000);
+@@ -338,7 +349,7 @@
+ 
+   {
+     Common::UniqueBuffer<u8> buffer;
+-    LoadFileStateData(filename, buffer);
++    LoadFileStateData(filename, buffer, GetMountedTwinSnakesDisc(system));
+ 
+     if (!buffer.empty())
+     {

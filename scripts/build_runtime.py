@@ -52,9 +52,11 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-cache-bat-translation.patch',
                 after=('recompcore-cache-instruction-hook.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-register-sync.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-x64-condition-register.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-headless-shader-progress.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-disc-mount-log.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-disc-fst-capacity.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-savestate-disc-check.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-twin-snakes-idle.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-llvm-region-check.patch')
     apply_patch(source / 'vendor/dolphin/DolRecomp', 'dolrecomp-win64-llvm-returns.patch')

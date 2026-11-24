@@ -304,6 +304,12 @@ Four 36-second, headless Tower A replays measured Windows CPU time on the emulat
 
 A follow-up cached the fallback JIT block-cache pointer to avoid a virtual call in the data-cache flush hook. Four matched 36-second headless Tower A runs measured 15.517 and 15.410 ms per recorded video update for dev.19 and 15.503 and 15.359 ms for the candidate. All four reached 100% median game speed. The difference was at most 0.051 ms per update and did not justify adding lifecycle state to the hot path.
 
+### x64 condition-register synchronization
+
+The runtime converts Dolphin's eight internal condition-register fields to the packed PowerPC value during native register synchronization. The x64 patch packs four fields at a time using SSE2. The packed value matched the scalar rules on one million test inputs covering full-width values and zero, sign and low-word edge cases.
+
+In four matched 36-second headless Tower A replays, CPU cost per video update fell from 15.675 to 15.197 ms in the first run order and from 15.474 to 15.259 ms in the reverse order. All runs reached 100% median game speed. The Disc 1 Underground Passage dialogue replay produced 23.448 seconds of sample-identical overlapping DSP audio on the reference and candidate, and both shut down normally. These tests establish the x64 CPU saving on this machine. Display pacing still needs separate measurement.
+
 ### Dev.19 packaged gameplay and audio
 
 The initial dev.19 package reused an object file that still contained the cache verifier. After forcing a rebuild, the staged runner and its startup logs no longer contained the verifier. The following runs use the rebuilt package.
