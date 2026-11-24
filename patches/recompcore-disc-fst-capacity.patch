@@ -1,0 +1,20 @@
+diff --git a/Source/Core/DiscIO/DirectoryBlob.cpp b/Source/Core/DiscIO/DirectoryBlob.cpp
+--- a/Source/Core/DiscIO/DirectoryBlob.cpp
++++ b/Source/Core/DiscIO/DirectoryBlob.cpp
+@@ -1164,10 +1164,12 @@
+   // overflow check, compare the aligned name offset with the aligned name table size
+   ASSERT(Common::AlignUp(name_offset, 1ull << m_address_shift) == name_table_size);
+ 
+-  // write FST size and location
+-  Write32((u32)(fst_address >> m_address_shift), 0x0424, disc_header);
+-  Write32((u32)(fst_data.size() >> m_address_shift), 0x0428, disc_header);
+-  Write32((u32)(fst_data.size() >> m_address_shift), 0x042c, disc_header);
++  const u32 fst_size = static_cast<u32>(fst_data.size() >> m_address_shift);
++  const u32 original_fst_capacity = Common::swap32(disc_header->data() + 0x042c);
++  // Games can reserve space at boot for the larger file table on a later disc.
++  Write32(static_cast<u32>(fst_address >> m_address_shift), 0x0424, disc_header);
++  Write32(fst_size, 0x0428, disc_header);
++  Write32(std::max(fst_size, original_fst_capacity), 0x042c, disc_header);
+ 
+   m_contents.Add(fst_address, std::move(fst_data));
+ 
