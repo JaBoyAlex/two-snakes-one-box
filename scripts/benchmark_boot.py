@@ -1,6 +1,7 @@
 """Benchmark CPU modes and native modules with isolated runtime settings."""
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import statistics
@@ -9,13 +10,54 @@ import tempfile
 import time
 
 
-def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load_state, dispatch_samples):
+def log_size(path):
+    try:
+        return path.stat().st_size
+    except FileNotFoundError:
+        return 0
+
+
+def summarize_intervals(path, start, end):
+    if end <= start:
+        return None
+    with path.open('rb') as stream:
+        stream.seek(start)
+        lines = stream.read(end - start).splitlines()
+    intervals = []
+    for line in lines:
+        try:
+            interval = float(line)
+        except ValueError:
+            continue
+        if math.isfinite(interval) and interval > 0:
+            intervals.append(interval)
+    if not intervals:
+        return None
+    intervals.sort()
+    return {'count': len(intervals), 'median': round(statistics.median(intervals), 3),
+            'p95': round(intervals[math.ceil(len(intervals) * 0.95) - 1], 3),
+            'maximum': round(intervals[-1], 3)}
+
+
+def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load_state, dispatch_samples,
+              *, dual_core=False, frame_times=False):
     control = work / 'control'
     command_dir = control / 'commands'
     command_dir.mkdir(parents=True)
     user = work / 'user'
     user.mkdir()
     (user / 'config.ini').write_text('resolution=640x528\nbackend=Vulkan\nfullscreen=false\n')
+    config = user / 'Config'
+    if dual_core or frame_times:
+        config.mkdir()
+    if dual_core:
+        (config / 'Dolphin.ini').write_text('[Core]\nCPUThread = True\n', encoding='ascii')
+    interval_logs = {}
+    if frame_times:
+        logs = user / 'Logs'
+        logs.mkdir()
+        (config / 'GFX.ini').write_text('[Settings]\nLogRenderTimeToFile = True\n', encoding='ascii')
+        interval_logs = {'render': logs / 'render_times.txt', 'vblank': logs / 'vblank_times.txt'}
     env = dict(os.environ, MODERNGEKKO_STATICRECOMP='1' if mode == 'aot' else '0')
     env.pop('STATICRECOMP_DISPATCH_SAMPLES', None)
     env.pop('STATICRECOMP_TRACE_FILE', None)
@@ -36,6 +78,8 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
         began_sampling = None
         previous_sample = None
         samples = []
+        interval_start = {}
+        interval_end = {}
         completed = False
         forced_stop = False
         try:
@@ -56,6 +100,8 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                 if began_sampling is None:
                     began_sampling = now
                 if previous_sample is not None and now - began_sampling >= 3:
+                    if not samples:
+                        interval_start = {name: log_size(path) for name, path in interval_logs.items()}
                     previous_time, previous_frame = previous_sample
                     samples.append({'seconds_since_boot': round(now - began_sampling, 2),
                                     'speed': speed,
@@ -64,6 +110,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                         samples[-1].update({'vps': vps, 'fps': fps})
                 previous_sample = now, frame
                 if now - began_sampling >= seconds + 3:
+                    interval_end = {name: log_size(path) for name, path in interval_logs.items()}
                     completed = True
                     break
         finally:
@@ -81,6 +128,13 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
     summary = {'cpu': mode, 'graphics': backend, 'headless': not windowed, 'exit_code': process.returncode,
                'completed': completed, 'forced_stop': forced_stop,
                'sample_count': len(samples), 'samples': samples}
+    if dual_core:
+        summary['dual_core_requested'] = True
+    if frame_times and completed:
+        summary['frame_intervals_ms'] = {
+            name: summarize_intervals(path, interval_start[name], interval_end[name])
+            for name, path in interval_logs.items()
+        }
     if samples:
         metrics = ['speed', 'drawn_fps', 'vps', 'fps'] if windowed else ['speed', 'drawn_fps']
         summary.update({f'median_{key}': round(statistics.median(sample[key] for sample in samples), 3)
@@ -104,16 +158,26 @@ def main():
     parser.add_argument('--output', type=Path,
                         help='Directory for isolated profiles and logs (default: system temporary directory)')
     parser.add_argument('--seconds', type=int, default=20)
+    parser.add_argument('--dual-core', action='store_true', help='Test separate CPU and video threads in the isolated profile')
+    parser.add_argument('--frame-times', action='store_true', help='Record render and video update intervals in windowed mode')
     parser.add_argument('--mode', choices=['aot', 'jit', 'both'],
                         help='Default: both, or aot for --compare-module')
     display = parser.add_mutually_exclusive_group()
-    display.add_argument('--windowed', action='store_true', help='Use Vulkan with a visible window and normal audio')
-    display.add_argument('--offscreen-vulkan', action='store_true', help='Render with Vulkan without a window or audio output')
+    backends = ['Vulkan', 'D3D', 'D3D12']
+    display.add_argument('--windowed', nargs='?', const='Vulkan', choices=backends,
+                         help='Use a visible window and normal audio (default backend: Vulkan)')
+    display.add_argument('--offscreen', choices=backends,
+                         help='Render with the selected backend without a window or audio output')
+    display.add_argument('--offscreen-vulkan', dest='offscreen', action='store_const', const='Vulkan',
+                         help='Alias for --offscreen Vulkan')
     args = parser.parse_args()
     if not 5 <= args.seconds <= 300:
         parser.error('--seconds must be between 5 and 300')
     if args.compare_module and args.mode not in (None, 'aot'):
         parser.error('--compare-module requires AOT mode')
+    windowed = args.windowed is not None
+    if args.frame_times and not windowed:
+        parser.error('--frame-times requires --windowed')
     data = args.data.resolve()
     prepared = json.loads((data / 'prepared.json').read_text())
     disc = prepared['discs'][0]
@@ -122,7 +186,7 @@ def main():
     load_state = args.load_state.resolve(strict=True) if args.load_state else None
     work = (args.output.resolve() / str(time.time_ns()) if args.output else
             Path(tempfile.mkdtemp(prefix='TwinSnakesRecompBenchmark-')))
-    backend = 'Vulkan' if args.windowed or args.offscreen_vulkan else 'Null'
+    backend = args.windowed or args.offscreen or 'Null'
     if args.compare_module:
         candidate = args.compare_module.resolve(strict=True)
         cases = [('reference-first', 'aot', module), ('candidate-second', 'aot', candidate),
@@ -134,8 +198,9 @@ def main():
     for label, mode, selected_module in cases:
         print(f'Running {label}', flush=True)
         outcomes.append(benchmark(mode, runner, data / disc['root'], selected_module,
-                                  work / label, args.windowed, backend, args.seconds,
-                                  load_state, args.dispatch_samples))
+                                  work / label, windowed, backend, args.seconds,
+                                  load_state, args.dispatch_samples, dual_core=args.dual_core,
+                                  frame_times=args.frame_times))
     print(f'Private logs and samples: {work}')
     return 0 if all(outcomes) else 1
 

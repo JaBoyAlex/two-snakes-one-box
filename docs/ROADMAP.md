@@ -33,16 +33,18 @@
 
 ## 5. Frame-rate work
 
-- Identify time-step, animation, physics, camera, input and cutscene dependencies.
+- Trace gameplay updates, animation, physics, camera transforms, input sampling and decoder frame timing using replays at the original game speed.
+- Prototype higher-rate rendering from interpolated camera and object state while retaining the original simulation and audio clocks. Check that interpolating a scene causes no gameplay state changes.
+- Include real-time cutscenes. Compare camera cuts, animation cues and dialogue timing with the original. Preserve source cadence and audio sync for prerecorded footage before evaluating optional smoothing.
 - Keep the original frame-rate mode available.
-- Test fixed 60/120/144 Hz and variable refresh without changing game speed or audio timing.
+- Test fixed 60/120/144 Hz and variable refresh at monitor-native output without changing game speed or audio timing.
 - Expose an unlocked option in RecompLauncher only after those tests pass.
-- Validate that world simulation, game timers, DSP/audio mixing, dialogue and movies advance at the same rate with render caps of 60, 120 and 144 Hz and with the cap removed. Report actual game-rendered frames separately from interpolation or generated frames.
+- Validate that world simulation, game timers, DSP/audio mixing, dialogue and movies advance at the same rate with the cap removed. Report simulation ticks, scene renders (including renders from interpolated state), repeated presents and video interpolation separately.
 
 ## 6. Optional PC graphics features
 
-- Evaluate Reflex after presentation pacing is stable. Measure input-to-present latency with the feature on and off on supported hardware.
-- Evaluate DLSS Super Resolution and DLAA if the renderer can supply valid scene color, depth, motion vectors and frame history resets. Check camera cuts, HUD, movies and effects for ghosting. Keep a baseline display path for other GPUs.
+- Evaluate Reflex after presentation pacing is stable. Record input, simulation, submission and present markers and measure input-to-present latency with the feature on and off on supported hardware.
+- Evaluate DLSS Super Resolution and DLAA if the renderer can supply scene color before the HUD, depth, motion vectors, jitter and frame history resets. Check camera cuts, HUD, movies and effects for ghosting. Keep a baseline display path for other GPUs.
 
 ## 7. Other platforms and extras
 
