@@ -114,7 +114,17 @@ The matched JIT reference also logged a 502 ms render interval while maintaining
 
 On a saved dialogue scene, headless hybrid and JIT replays produced exactly the same 907,088 overlapping DSP stereo sample frames, spanning 28.322 seconds. The replays used the original guest clock and captured audio before it reached the Windows output backend. The hybrid sampled speed reached a low of 92.4% while the PC was in use during testing.
 
-A separate Windows process loopback capture measured 9.99 seconds of output from the running hybrid build and 24.99 seconds from the JIT dialogue reference. Both captures reported zero packet discontinuities and zero timestamp gaps larger than 2 ms. These were different scenes. A matched hybrid output capture at the reported stutter point is still needed to test the mixer and playback path under load. [Windows application loopback capture](https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/applicationloopbackaudio-sample/)
+A matched Windows process loopback test replayed the saved dialogue scene in windowed Vulkan at 4× internal resolution. Each run captured about 18 seconds of Cubeb output and shut down normally. Windows reported no packet discontinuities or timestamp gaps larger than 2 ms. At least 21.26 seconds of the captured guest DSP output matched the JIT reference sample for sample in each hybrid run. [Windows application loopback capture](https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/applicationloopbackaudio-sample/)
+
+| CPU mode | Threads | Median game speed | Lowest sampled game speed |
+| --- | --- | ---: | ---: |
+| JIT | Shared | 100.0% | 99.7% |
+| Hybrid | Shared | 100.2% | 90.6% |
+| Hybrid | Separate | 100.3% | 98.6% |
+
+The shared-thread hybrid run still dipped below full speed. The loopback measured packet continuity for one scene. Listening for repeated or distorted audio under sustained load and testing later scenes remain open.
+
+The in-game Digital Camera wrote a valid photo after enabling external framebuffer copies to guest memory. A separate dock replay tested this option at 4× internal resolution with offscreen Vulkan and separate CPU and video threads. The four runs compared both settings in both orders. Median game speeds were 92.4–94.1% with the default and 96.7–96.8% with photo capture enabled. This single checkpoint showed no slowdown from the option. Its cost in other scenes and graphics backends is unmeasured.
 
 ## Tool comparisons
 

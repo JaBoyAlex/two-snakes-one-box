@@ -30,3 +30,5 @@ RecompLauncher checks the GameCube disc ID before setup. The setup program check
 The display setting `fullscreen=auto` follows the launcher mode at each start. Big Picture uses borderless fullscreen and desktop mode opens a window. Explicit `true` and `false` override that behavior. The separate `resolution=auto` option chooses an integer internal scale from the output area. Existing resolution values such as `640x528` and `2560x1440` still select fixed scales.
 
 The launcher allows one visible game per user across package folders. Setup and headless diagnostics use the lock for their own data directory. Close a running game before opening another package for interactive play.
+
+Enable **Photo Album capture** under the launcher’s advanced video settings before taking pictures with the in-game Digital Camera. For standalone play, set `XFBToTextureEnable = False` under `[Hacks]` in the data folder’s `user/Config/GFX.ini` before starting the game. Take a new photo after enabling the setting.

@@ -87,6 +87,15 @@
         "show_fps_in_title": "true",
         "fullscreen": "auto"
       }
+    },
+    {
+      "id": "graphics",
+      "format": "ini",
+      "file": [
+        {
+          "path": "{data}/user/Config/GFX.ini"
+        }
+      ]
     }
   ],
   "settings": [
@@ -184,6 +193,31 @@
           "label": "OpenGL",
           "set": {
             "backend": "OpenGL"
+          }
+        }
+      ]
+    },
+    {
+      "id": "photo_capture",
+      "label": "Photo Album capture",
+      "group": "Video",
+      "in": "graphics",
+      "advanced": true,
+      "help": "Enable this before taking in-game photos to save the picture correctly.",
+      "defaults": {
+        "Hacks/XFBToTextureEnable": "True"
+      },
+      "choices": [
+        {
+          "label": "Off",
+          "set": {
+            "Hacks/XFBToTextureEnable": "True"
+          }
+        },
+        {
+          "label": "On",
+          "set": {
+            "Hacks/XFBToTextureEnable": "False"
           }
         }
       ]
