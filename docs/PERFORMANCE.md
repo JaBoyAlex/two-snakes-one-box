@@ -147,6 +147,30 @@ Separate-thread headless runs of the same Tower A checkpoint reached median spee
 
 A separate symbolized run with output disabled collected 579 instruction-pointer samples from the busiest thread. The runner accounted for 373 samples and the compiled boot module for 135. Among named runner functions, the static recomp run loop had 85 samples, its instruction-cache invalidation handler had 44, and native address resolution and its lookup helper had 51. The JIT block-cache invalidation function had 22. These are starting points for profiling repeated invalidations and address lookup before changing frame timing.
 
+### Cache invalidation and dispatch
+
+The runtime now forwards the physical and effective addresses from each translated cache invalidation to the fallback JIT. Fixed-address modules use one native chunk lookup. Invalidations outside the span of the compiled chunks skip the native range search. Invalidations that touch compiled code still trigger revalidation before its next native dispatch.
+
+The Tower A comparison used the same Disc 2 checkpoint and compiled boot module with fresh profiles, separate CPU and video threads, and 49 samples per run. Each row contains two runs per build, with the order reversed for the second pair.
+
+| Output | Dev.14 median game speed | Patched median game speed | Dev.14 lowest sample | Patched lowest sample |
+| --- | ---: | ---: | ---: | ---: |
+| Graphics and audio disabled | 70.5%, 80.1% | 100.1%, 99.8% | 61.5%, 67.1% | 79.0%, 92.6% |
+| Offscreen Vulkan at 4×, audio disabled | 75.2%, 77.2% | 99.9%, 98.2% | 67.0%, 70.9% | 93.0%, 75.3% |
+
+All eight replays shut down normally. Each recorded 20 chunk verifications, six invalidations that marked chunks for revalidation, and the same single chunk rejected for a guest-code hash mismatch.
+
+Both discs completed fresh headless boots at 100% median game speed and shut down normally. In a separate Disc 1 test, the one-chunk module for the game's virtual-memory region executed 6,702 native dispatches. The same module with a deliberately wrong expected hash was rejected and executed zero native dispatches. Both runs advanced at 100% median speed with JIT fallback available.
+
+The windowed Tower A comparison used Vulkan at 4×, Cubeb, an 80 ms audio buffer and DSP dumping. Windows process loopback recorded 18 seconds of audio per run with zero packet discontinuities in all four runs. The patched runner still slowed below real time.
+
+| CPU and video execution | Dev.14 median speed | Patched median speed | Dev.14 render interval p95 | Patched render interval p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Shared thread | 74.7% | 89.9% | 26.00 ms | 22.19 ms |
+| Separate threads | 75.9% | 95.9% | 25.26 ms | 21.05 ms |
+
+A separate windowed 4× Vulkan run with the default shared-thread configuration, Cubeb and DSP dumping disabled reached 91.7% median game speed and 84.5% at its lowest sample. Its 95th-percentile render interval was 21.44 ms across 989 intervals. The next performance target is the remaining windowed slowdown with normal audio and graphics enabled.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.

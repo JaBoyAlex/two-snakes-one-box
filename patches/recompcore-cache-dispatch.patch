@@ -1,0 +1,103 @@
+diff --git a/Source/Core/Core/PowerPC/JitCommon/JitCache.h b/Source/Core/Core/PowerPC/JitCommon/JitCache.h
+--- a/Source/Core/Core/PowerPC/JitCommon/JitCache.h
++++ b/Source/Core/Core/PowerPC/JitCommon/JitCache.h
+@@ -144,6 +144,8 @@
+ 
+ class JitBaseBlockCache
+ {
++  friend class StaticRecompCore;
++
+ public:
+   // The size of the fast map is determined like this:
+   // ((4 GiB guest memory space) / (4-byte alignment) * sizeof(JitBlock*)) << (3 feature flag bits)
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
+@@ -104,9 +104,9 @@
+ 
+   protected:
+     void InvalidateICacheInternal(u32 physical_address, u32 address, u32 length,
+-                                  bool forced) override
++                                  bool /*forced*/) override
+     {
+-      m_core.OnICacheInvalidate(address, length);
++      m_core.OnICacheInvalidate(physical_address, address, length);
+     }
+ 
+   private:
+@@ -128,7 +128,7 @@
+     CHUNK_FAILED = 2,
+   };
+ 
+-  void OnICacheInvalidate(u32 address, u32 length);
++  void OnICacheInvalidate(u32 physical_address, u32 address, u32 length);
+   int ChunkIndexOf(u32 address);
+   bool IsForcedFallbackAddress(u32 address) const;
+   bool ChunkContainsHostCall(u32 index) const;
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp
+@@ -207,7 +207,7 @@
+     return -1;
+ 
+   u32 linked_address = address;
+-  if (!ResolveNativeAddress(address, &linked_address, nullptr))
++  if (m_has_rel_modules && !ResolveNativeAddress(address, &linked_address, nullptr))
+     return -1;
+   int idx = GetAddressLookupIndex(linked_address);
+   if (idx < 0 || idx >= static_cast<int>(m_chunk_lookup_table.size()))
+@@ -343,35 +343,44 @@
+   }
+ }
+ 
+-void StaticRecompCore::OnICacheInvalidate(u32 address, u32 length)
++void StaticRecompCore::OnICacheInvalidate(u32 physical_address, u32 address, u32 length)
+ {
+   if (m_fallback_jit)
+   {
+-    m_fallback_jit->GetBlockCache()->InvalidateICache(address, length, false);
++    // The outer cache already translated and split this range using the shared MMU.
++    m_fallback_jit->GetBlockCache()->InvalidateICacheInternal(physical_address, address, length,
++                                                            false);
+   }
+ 
+   if (!m_module_active || length == 0)
+     return;
+-  u32 linked_address = address;
+-  ResolveNativeAddress(address, &linked_address, nullptr);
+-  address = linked_address;
++  if (m_has_rel_modules)
++  {
++    u32 linked_address = address;
++    ResolveNativeAddress(address, &linked_address, nullptr);
++    address = linked_address;
++  }
+   const u32 last = address + (length - 1u);
++  const auto* ranges = m_module->chunk_ranges;
++  const u32 count = m_module->num_chunk_ranges;
++  if (last < ranges[0].start || address >= ranges[count - 1].end)
++    return;
+ 
+   // Binary search to find the first chunk index that could possibly overlap (chunk.end > address)
+   u32 lo = 0;
+-  u32 hi = m_module->num_chunk_ranges;
++  u32 hi = count;
+   while (lo < hi)
+   {
+     const u32 mid = lo + (hi - lo) / 2;
+-    if (m_module->chunk_ranges[mid].end <= address)
++    if (ranges[mid].end <= address)
+       lo = mid + 1;
+     else
+       hi = mid;
+   }
+ 
+-  for (u32 i = lo; i < m_module->num_chunk_ranges; ++i)
+-  {
+-    const auto& chunk = m_module->chunk_ranges[i];
++  for (u32 i = lo; i < count; ++i)
++  {
++    const auto& chunk = ranges[i];
+     if (chunk.start > last)
+       break;
+ 
