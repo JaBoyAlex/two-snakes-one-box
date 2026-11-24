@@ -13,7 +13,7 @@ python app/twin_snakes.py
 
 The builder writes private disc-derived files under the chosen data directory. For a development checkout, use `--data .local/player`. Use `--runtime PATH` to select a staged open-source runtime; the default development location is `.local/runtime`.
 
-Setup places each disc in its build directory after extraction succeeds and verifies its executable. It reuses the compiled module when the binary is nonempty and the completion record is present. Running setup again rebuilds an empty module even if its completion record survived. Save files and settings live under the separate `user` directory.
+Setup verifies the extracted boot executable before reusing a disc directory. Running setup again replaces a missing or damaged executable from the verified disc image. The compiled native module is reused only if it matches the SHA-256 recorded at link completion. An older install with an empty completion record rebuilds once when setup is run again. Save files and settings live under the separate `user` directory.
 
 To build the experimental native gameplay module, add `--experimental-rel` to `--prepare` after rebuilding the source runtime. Give the experiment its own `--data` directory. The builder links the verified REL from the selected discs and selects the new build after both discs are prepared. The regular launcher install uses the boot-only module while gameplay and timing tests are pending.
 

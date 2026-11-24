@@ -302,6 +302,8 @@ A diagnostic build compared every 64th cache-flush lookup against the original M
 
 Four 36-second, headless Tower A replays measured Windows CPU time on the emulation thread per recorded video update. In the first run order the cost fell from 16.906 to 16.178 ms per update. In the reverse order it fell from 16.647 to 16.012 ms. That frees about 4% of the thread's CPU budget in this checkpoint. The original 59.94 Hz video timing gives a wall-time budget of about 16.68 ms per update. The headless runs isolate CPU cost from window presentation.
 
+A follow-up cached the fallback JIT block-cache pointer to avoid a virtual call in the data-cache flush hook. Four matched 36-second headless Tower A runs measured 15.517 and 15.410 ms per recorded video update for dev.19 and 15.503 and 15.359 ms for the candidate. All four reached 100% median game speed. The difference was at most 0.051 ms per update and did not justify adding lifecycle state to the hot path.
+
 ### Dev.19 packaged gameplay and audio
 
 The initial dev.19 package reused an object file that still contained the cache verifier. After forcing a rebuild, the staged runner and its startup logs no longer contained the verifier. The following runs use the rebuilt package.

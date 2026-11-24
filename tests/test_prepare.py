@@ -63,6 +63,31 @@ class PrepareTests(unittest.TestCase):
                 twin_snakes.extract_disc(None, self.disc, self.build, self.root, None, rel_layout)
         self.assertFalse((self.build / 'disc1').exists())
 
+    def test_repair_replaces_corrupt_extraction_after_verifying_new_copy(self):
+        extracted = self.build / 'disc1'
+        self.write_extraction(extracted)
+        dol = extracted / 'sys/main.dol'
+        dol.write_bytes(b'damaged DOL')
+
+        def extract_again(command, *_args, **_kwargs):
+            self.assertEqual(dol.read_bytes(), b'damaged DOL')
+            self.write_extraction(command[-1])
+
+        def failed_repair(command, *_args, **_kwargs):
+            (command[-1] / 'sys').mkdir()
+
+        with patch.object(twin_snakes, 'run', side_effect=failed_repair):
+            with self.assertRaisesRegex(DiscError, 'Extracted executable does not match'):
+                twin_snakes.extract_disc(None, self.disc, self.build, self.root, None, None)
+        self.assertEqual(dol.read_bytes(), b'damaged DOL')
+
+        with patch.object(twin_snakes, 'run', side_effect=extract_again) as run:
+            self.assertEqual(twin_snakes.extract_disc(None, self.disc, self.build, self.root, None, None),
+                             extracted)
+            run.assert_called_once()
+        self.assertEqual(dol.read_bytes(), b'test DOL')
+        self.assertEqual(list(self.build.iterdir()), [extracted])
+
     def test_link_retry_does_not_reuse_partial_native_output(self):
         self.write_extraction(self.build / 'disc1')
         attempts = 0
@@ -113,6 +138,25 @@ class PrepareTests(unittest.TestCase):
             _, result = twin_snakes.build_disc(None, self.disc, self.build, self.root, {}, 'cmake', 'cc', None)
         self.assertEqual(result.read_bytes(), b'linked output')
         self.assertTrue(marker.is_file())
+
+    def test_repair_rebuilds_a_corrupted_nonempty_module(self):
+        self.write_extraction(self.build / 'disc1')
+
+        def compile_module(command, *_args, **_kwargs):
+            if command[1] == '--gamecube':
+                (command[-1] / 'generated').mkdir(parents=True, exist_ok=True)
+            elif command[1] == '--build':
+                suffix = '.dll' if sys.platform == 'win32' else ('.dylib' if sys.platform == 'darwin' else '.so')
+                command[2].mkdir(parents=True, exist_ok=True)
+                (command[2] / ('gGGSEA4_recomp' + suffix)).write_bytes(b'linked output')
+
+        args = (None, self.disc, self.build, self.root, {}, 'cmake', 'cc', None)
+        with patch.object(twin_snakes, 'run', side_effect=compile_module):
+            _, module = twin_snakes.build_disc(*args)
+            module.write_bytes(b'broken bytes!')
+            self.assertEqual(len(module.read_bytes()), len(b'linked output'))
+            twin_snakes.build_disc(*args)
+        self.assertEqual(module.read_bytes(), b'linked output')
 
     def test_recomplauncher_setup_writes_utf8_on_both_pipes(self):
         filename = 'Disc \u00e9 \u6e2c\u8a66.rvz'

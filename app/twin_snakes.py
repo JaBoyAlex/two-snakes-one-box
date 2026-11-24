@@ -186,31 +186,51 @@ def compiler_environment(runtime):
 
 def verify_extraction(extracted, disc, rel_layout):
     dol = extracted / 'sys/main.dol'
-    if digest(dol) != disc.dol_sha256:
+    if not dol.is_file() or digest(dol) != disc.dol_sha256:
         raise DiscError('Extracted executable does not match the selected disc.')
     if rel_layout:
         rel = extracted / rel_layout['path']
-        if digest(rel) != rel_layout['sha256']:
+        if not rel.is_file() or digest(rel) != rel_layout['sha256']:
             raise DiscError('Extracted game module does not match the verified revision.')
+
+
+def extraction_ready(extracted, disc, rel_layout):
+    try:
+        verify_extraction(extracted, disc, rel_layout)
+    except (FileNotFoundError, DiscError):
+        return False
+    return True
 
 
 def extract_disc(iso, disc, build, runtime, log, rel_layout):
     extracted = build / f'disc{disc.number + 1}'
-    if extracted.is_dir():
-        verify_extraction(extracted, disc, rel_layout)
+    if extraction_ready(extracted, disc, rel_layout):
         return extracted
     build.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=f'{extracted.name}-', dir=build) as temp_dir:
-        staging = Path(temp_dir)
+        staging = Path(temp_dir) / 'fresh'
+        staging.mkdir()
         run([tool(runtime, 'dolrecomp'), 'extract', iso, staging], log, code=20)
         verify_extraction(staging, disc, rel_layout)
-        staging.rename(extracted)
+        previous = Path(temp_dir) / 'previous'
+        if extracted.exists():
+            extracted.rename(previous)
+        try:
+            staging.rename(extracted)
+        except OSError:
+            if previous.exists():
+                previous.rename(extracted)
+            raise
     return extracted
 
 
 def native_module_ready(module):
-    return (module.is_file() and module.stat().st_size > 0
-            and module.with_name('link.complete').is_file())
+    try:
+        expected = json.loads(module.with_name('link.complete').read_text(encoding='utf-8'))
+    except (FileNotFoundError, ValueError):
+        return False
+    return (isinstance(expected, str) and module.is_file() and module.stat().st_size > 0
+            and digest(module) == expected)
 
 
 def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layout=None):
@@ -260,7 +280,7 @@ def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layo
         on_line=report_compilation)
     if not module.is_file() or module.stat().st_size == 0:
         raise SetupError('The compiler did not produce the expected native module.', 22)
-    module_ready.touch()
+    atomic_json(module_ready, digest(module))
     return extracted, module
 
 
@@ -303,8 +323,10 @@ def prepare(args, runtime, data, log):
     if completed.is_file():
         record = json.loads(completed.read_text(encoding='utf-8'))
         if (record['identity'] == identity and len(record['discs']) == 2
-                and all((data / entry['dol']).is_file() and native_module_ready(data / entry['module'])
-                        for entry in record['discs'])):
+                and all(extraction_ready(data / entry['root'], disc, rel_layout)
+                        for entry, disc in zip(record['discs'], (first, second)))
+                and all(native_module_ready(module)
+                        for module in {data / entry['module'] for entry in record['discs']})):
             atomic_json(data / 'prepared.json', record)
             progress(1, 'Already built')
             return
