@@ -302,7 +302,30 @@ A diagnostic build compared every 64th cache-flush lookup against the original M
 
 Four 36-second, headless Tower A replays measured Windows CPU time on the emulation thread per recorded video update. In the first run order the cost fell from 16.906 to 16.178 ms per update. In the reverse order it fell from 16.647 to 16.012 ms. That frees about 4% of the thread's CPU budget in this checkpoint. The original 59.94 Hz video timing gives a wall-time budget of about 16.68 ms per update. The headless runs isolate CPU cost from window presentation.
 
-The packaged dev.19 runner completed a 22-second Tower A audio capture at 4× Vulkan. It reached 100.0% median and 99.69% minimum sampled game speed, with a longest VBlank interval of 21.84 ms. The per-process Windows capture recorded 2,200 packets, zero reported discontinuities, and zero timestamp gaps over 2 ms among packets with valid timestamps.
+### Dev.19 packaged gameplay and audio
+
+The initial dev.19 package reused an object file that still contained the cache verifier. After forcing a rebuild, the staged runner and its startup logs no longer contained the verifier. The following runs use the rebuilt package.
+
+Four 22-second saved-scene replays used shared CPU and video threads, 4× Vulkan, Cubeb, and Windows per-process loopback capture. Each run had zero reported audio packet discontinuities and zero timestamp gaps over 2 ms among packets with valid timestamps. All four exited normally.
+
+| Scene | Median game speed | Speed p05 | Minimum sampled speed | Longest VBlank interval | Audio packets |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Tower A alarm | 100.0% | 92.89% | 85.55% | 37.47 ms | 2,199 |
+| Underground Passage flashback | 100.0% | 99.77% | 96.48% | 32.59 ms | 2,200 |
+| Hind fight | 100.0% | 100.0% | 99.99% | 23.49 ms | 2,199 |
+| Hind fight repeat | 100.0% | 100.0% | 100.0% | 20.27 ms | 2,199 |
+
+The 69.05 ms VBlank gap seen in the initial Hind fight capture did not recur in these two replays. The flashback had a 66.75 ms 95th-percentile render interval while its video updates continued at a median interval of 16.68 ms. The earlier JIT reference had a similar render interval in this scene. Tower A still had short drops in sampled game speed. The loopback checks measure audio delivery, and listening tests under sustained load remain open.
+
+Three 75-second Tower A replays used the rebuilt package, warm shader caches, a Vulkan window and normal audio. The first run overlapped the end of a package-digest check, so the 1× replay was repeated after the check finished. All runs used shared CPU and video threads and exited normally.
+
+| Internal scale in run order | Median game speed | Speed p05 | Samples below 95% | Longest VBlank interval | VBlank intervals over 50 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1× | 100.0% | 96.8% | 8 of 301 | 56.04 ms | 2 |
+| 4× | 100.0% | 97.6% | 7 of 301 | 40.19 ms | 0 |
+| 1× repeat | 100.0% | 98.1% | 5 of 300 | 43.92 ms | 0 |
+
+The short speed drops persisted at both scales. This run order shows that a long gap can occur at 1× and leaves the effect of resolution on worst-case pacing open.
 
 ## Tool comparisons
 
