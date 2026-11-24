@@ -171,6 +171,32 @@ The windowed Tower A comparison used Vulkan at 4×, Cubeb, an 80 ms audio buffer
 
 A separate windowed 4× Vulkan run with the default shared-thread configuration, Cubeb and DSP dumping disabled reached 91.7% median game speed and 84.5% at its lowest sample. Its 95th-percentile render interval was 21.44 ms across 989 intervals. The next performance target is the remaining windowed slowdown with normal audio and graphics enabled.
 
+### Windowed Tower A follow-up
+
+In a windowed 4× Vulkan profile, 150 of 574 instruction-pointer samples landed in the compiled boot module. The busiest named runtime functions included the native run loop (36 samples), instruction fallback (33) and cache invalidation (20). The sampler suspended the CPU thread to read its instruction pointer, so speed readings from this run are excluded from the comparison.
+
+The first trial sent native data-cache flushes directly through the static recomp cache. Each replay used the same Disc 2 state, shared CPU and video execution, Cubeb output, and 18 seconds of samples. The second pair reversed the run order.
+
+| Runner | Median game speed | Lowest speed sample | Render interval p95 | Longest render interval |
+| --- | ---: | ---: | ---: | ---: |
+| Dev.15 | 88.7%, 92.7% | 70.9%, 83.2% | 22.29, 20.60 ms | 49.88, 45.55 ms |
+| Direct cache hook trial | 94.6%, 92.4% | 80.2%, 78.9% | 20.71, 20.84 ms | 39.27, 108.57 ms |
+
+JIT-only reached 100.0% median speed and a 99.8% minimum with the original shared-thread 4× Vulkan and audio settings. The hybrid trial reached 95.3% median at 1× Vulkan, 89.8% at 4× Direct3D 11, and 99.3% with separate CPU and video threads at 4× Vulkan. The separate-thread run still dipped to 92.2%. These controls point to the hybrid CPU path as the remaining bottleneck in this replay.
+
+The next build checks native chunk coverage and the fallback JIT's physical cache-line bitset for data-cache operations when accurate data-cache emulation is disabled. The runtime translates the address first and forwards lines that can affect either code cache to the invalidation path.
+
+Two alternating comparisons used the normal shared-thread window at 4× Vulkan with Cubeb and DSP dumping disabled. Each run completed 72 or 73 samples and shut down normally.
+
+| Runner | Median game speed | Lowest speed sample | Render interval p95 | Longest render interval |
+| --- | ---: | ---: | ---: | ---: |
+| Dev.15 | 94.2%, 91.3% | 88.1%, 86.9% | 19.38, 20.95 ms | 40.62, 43.35 ms |
+| Filtered cache hook | 99.9%, 99.2% | 89.6%, 95.2% | 18.66, 18.91 ms | 36.02, 36.46 ms |
+
+Both patched runs reached near-normal median speed. Their speed floors still varied across runs. All four runs recorded 20 native chunk verifications, six invalidations that marked chunks for revalidation, and the same single guest-code hash mismatch.
+
+The patched Hind fight replay reached 100.0% median game speed and a 99.5% minimum in the same windowed configuration. A separate Tower A capture with DSP dumping and an 80 ms audio buffer recorded 17.99 seconds of Cubeb output with zero packet discontinuities. That instrumented run reached 96.3% median game speed and dipped to 83.1%.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.

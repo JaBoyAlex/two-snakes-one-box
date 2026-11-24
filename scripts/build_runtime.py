@@ -48,6 +48,7 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-linking.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-verified-virtual-code.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-cache-dispatch.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-cache-instruction-hook.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-headless-shader-progress.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-disc-mount-log.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-disc-fst-capacity.patch')

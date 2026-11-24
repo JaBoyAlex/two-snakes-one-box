@@ -31,6 +31,7 @@
   "patches/moderngekko-windows-utf8-paths.patch",
   "patches/recompcore-auto-gamepad.patch",
   "patches/recompcore-cache-dispatch.patch",
+  "patches/recompcore-cache-instruction-hook.patch",
   "patches/recompcore-disc-fst-capacity.patch",
   "patches/recompcore-disc-mount-log.patch",
   "patches/recompcore-empty-gamepad-config.patch",

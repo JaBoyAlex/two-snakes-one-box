@@ -1,0 +1,51 @@
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Hooks.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Hooks.cpp
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Hooks.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Hooks.cpp
+@@ -365,7 +365,8 @@
+ void StaticRecompCore::HookInstructionFallback(CPUState* cpu, u32 raw, u32 cia)
+ {
+   auto* core = static_cast<StaticRecompCore*>(cpu->external_user_data);
+-  cia = core->TranslateRelAddress(cia);
++  if (core->m_has_rel_modules)
++    cia = core->TranslateRelAddress(cia);
+   ++core->m_hook_fallback_instructions;
+ 
+   // Lockstep: a block that fell back to the interpreter for an unmodeled
+@@ -376,7 +377,7 @@
+     core->m_lockstep_verifier->m_ls_fallback_seen = true;
+ 
+   auto& system = core->m_system;
+-  auto& ppc = system.GetPPCState();
++  auto& ppc = core->m_ppc_state;
+ 
+   // Fast path for dcbf/dcbst/dcbi/icbi: streaming code flushes caches in
+   // 32-byte loops (thousands per frame), and these ops read two GPRs and
+@@ -396,7 +397,27 @@
+       if (xo == 982u)
+         ppc.iCache.Invalidate(system.GetMemory(), system.GetJitInterface(), ea);
+       else
+-        system.GetJitInterface().InvalidateICacheLine(ea);
++      {
++        const u32 line = ea & ~0x1fu;
++        const auto translated = core->m_mmu.JitCache_TranslateAddress(line);
++        if (translated.valid)
++        {
++          const auto* module = core->m_module;
++          const bool may_touch_native =
++              core->m_module_active &&
++              (core->m_has_rel_modules ||
++               (line + 31 >= module->chunk_ranges[0].start &&
++                line < module->chunk_ranges[module->num_chunk_ranges - 1].end));
++          const auto* fallback_cache =
++              core->m_fallback_jit ? core->m_fallback_jit->GetBlockCache() : nullptr;
++          // Apply the JIT's existing single-line fast rejection to data flushes.
++          // Native code has separate coverage and still receives its invalidation.
++          if (may_touch_native ||
++              (fallback_cache && ((translated.address & 0x1fu) != 0 ||
++                                  fallback_cache->valid_block.Test(translated.address / 32))))
++            core->OnICacheInvalidate(translated.address, line, 32);
++        }
++      }
+       // These bypass SingleStepInner, so charge Dolphin's PPCTables cost
+       // here (icbi 4, dcbf/dcbst/dcbi 5); their emitted block cost is zero.
+       ppc.downcount -= (xo == 982u) ? 4 : 5;
