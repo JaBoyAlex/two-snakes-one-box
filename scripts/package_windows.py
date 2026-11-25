@@ -74,7 +74,14 @@ def main():
     for name in VC_FILES:
         shutil.copy2(vc_runtime / name, stage / 'runtime' / name)
     shutil.copytree(args.tools / 'python', stage / 'python')
-    for name in ['cmake', 'ninja', 'llvm-mingw']:
+    cmake = args.tools / 'cmake'
+
+    def omit_cmake_html(folder, _entries):
+        # The CLI uses the help tree under share. Keep doc/cmake's license notices.
+        return ('html',) if Path(folder) == cmake / 'doc/cmake' else ()
+
+    shutil.copytree(cmake, stage / 'tools/cmake', ignore=omit_cmake_html)
+    for name in ['ninja', 'llvm-mingw']:
         shutil.copytree(args.tools / name, stage / 'tools' / name)
     (stage / 'portable.txt').touch()
     check_package_tree(stage)

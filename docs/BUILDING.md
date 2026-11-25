@@ -29,6 +29,8 @@ The local game build requires CMake, Ninja and a C compiler. `scripts/package_wi
 
 Use the runtime staging directory from `build_runtime.py` as the package input. The packager checks it before copying and checks the assembled package before writing its inventory. Player directories, generated runtime code, disc and save files, and diagnostic output cause packaging to stop.
 
+The portable package includes CMake's command-line help and license notices. Its generated HTML manual is omitted from the bundled tool directory.
+
 For a local installation test, add `--stage-only` with a new `--version`. If the workspace is synced, pass `--staging-root` pointing to a private, non-synced folder. RecompLauncher can place generated game data beside a portable build. In beta 68, open Settings, choose **Bring Your Games**, then **Pick a Folder**, and select the reported folder containing `TwinSnakes.exe` and `recomplauncher.json`. Choose **Go Through Them** and **Add Without Updates**. The **Add a build** screen in developer mode is also available. Check both disc prompts, prepare a fresh data directory, and verify that the display and resolution choices persist through **Play**. Test the same setup in Big Picture before submitting a release. [RecompLauncher developer guide](https://github.com/elripalda/RecompLauncher/blob/main/docs/DEVELOPERS.md#checking-your-file)
 
 RecompLauncher checks the GameCube disc ID before setup. The setup program checks disc order, revision, and the SHA-256 of each normalized disc. The manifest leaves whole-file dump checks to setup so RVZ and GCZ files are compared after conversion.
