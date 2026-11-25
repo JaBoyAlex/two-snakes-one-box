@@ -475,6 +475,12 @@ All four windowed replays restored the same Disc 2 Tower A checkpoint and ran fo
 
 Vulkan reached the first advancing frame in 4.26–4.52 seconds. Direct3D 11 took 24.29–24.72 seconds and regenerated its shader files. The old Direct3D 11 cache header contained a fallback version string. The new runtime records the RecompCore Git revision, and its disk cache requires the revision to match. Frame sampling started after startup and checkpoint restore. These results cover the same checkpoint and graphics card as the dev.25 comparison.
 
+Two further 20-second Direct3D 11 runs seeded from the regenerated dev.28 cache reached the first advancing frame in 5.02 and 5.27 seconds. Both held 100% median speed with zero samples below 95% and normal shutdown. The longer startup was confined to rebuilding the imported Direct3D 11 cache in this test.
+
+### Dev.28 headless CPU samples
+
+An MSVC map build replayed the same Tower A checkpoint headlessly for 25 seconds in both JIT and hybrid modes. Both held 100% median game speed. A 12-second instruction-pointer capture began seven seconds after the checkpoint loaded. Of 765 snapshots in the hybrid run, 184 landed in the native game module. The runner's instruction fallback hook accounted for 64, the native run loop for 53, and register synchronization for 28. The same sampler captured 375 snapshots in `ntdll.dll` out of 764 in the JIT run. The counts include waits and pauses from sampling and locate CPU paths for follow-up.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
