@@ -449,6 +449,17 @@ The dev.25 package also ran both checkpoints in normal windows with warm caches,
 
 Four clean-cache Disc 1 starts at 4× reached the first advancing frame in 29.20–29.59 seconds with automatic shader worker selection. Limiting shader precompilation to six workers took 30.64–30.88 seconds in the same order-reversed comparison. A warm Direct3D 11 run reached the first advancing frame in 4.77 seconds. The automatic worker count stays selected.
 
+### Dev.25 Tower A with Windows audio
+
+Both windowed runs restored the same Disc 2 Tower A alarm checkpoint before sampling. They used 4× internal resolution, warm shader caches, shared CPU and video threads, and Cubeb with an 80 ms audio buffer. Windows process loopback captured 54.99 seconds of game audio per run. Both captures contained 5,496 audible packets and reported zero packet discontinuities or timestamp gaps above 2 ms. Both runs shut down normally.
+
+| Backend | Median / minimum game speed | Samples below 95% speed | Maximum render / vertical blank interval |
+| --- | ---: | ---: | ---: |
+| Vulkan | 100% / 86.09% | 12 / 220 | 41.01 / 49.75 ms |
+| Direct3D 11 | 100% / 97.40% | 0 / 220 | 38.75 / 30.53 ms |
+
+The comparison covers one matched run per backend on a GeForce RTX 3060 Ti. Listening quality and the cause of the short Vulkan dips still need separate checks.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
