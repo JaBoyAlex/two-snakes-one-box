@@ -1,0 +1,53 @@
+diff --git a/src/runtime/game.cpp b/src/runtime/game.cpp
+--- a/src/runtime/game.cpp
++++ b/src/runtime/game.cpp
+@@ -11,6 +11,12 @@
+ #include <sstream>
+ #include <vector>
+ 
++#ifdef _WIN32
++#include <limits>
++#include <windows.h>
++#include <bcrypt.h>
++#endif
++
+ namespace moderngekko
+ {
+ namespace
+@@ -23,6 +29,22 @@
+   auto bytes = ReadFileBytes(path);
+   if (!bytes)
+     return std::nullopt;
++#if defined(_WIN32) && defined(BCRYPT_SHA256_ALG_HANDLE)
++  if (bytes->size() <= (std::numeric_limits<ULONG>::max)())
++  {
++    std::array<std::uint8_t, 32> digest{};
++    if (BCryptHash(BCRYPT_SHA256_ALG_HANDLE, nullptr, 0, bytes->data(),
++                   static_cast<ULONG>(bytes->size()), digest.data(),
++                   static_cast<ULONG>(digest.size())) == 0)
++    {
++      std::ostringstream hex;
++      hex << std::hex << std::setfill('0');
++      for (const auto value : digest)
++        hex << std::setw(2) << static_cast<unsigned int>(value);
++      return hex.str();
++    }
++  }
++#endif
+   return Sha256(std::move(*bytes));
+ }
+ 
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -238,6 +238,10 @@
+     "${CMAKE_CURRENT_SOURCE_DIR}/vendor/dolphin_legacy")
+ 
+ target_link_libraries(moderngekko PUBLIC ModernGekko::ABI PRIVATE fmt::fmt)
++if(WIN32)
++    target_link_libraries(moderngekko_legacy PRIVATE bcrypt)
++    target_link_libraries(moderngekko PRIVATE bcrypt)
++endif()
+ if(MODERNGEKKO_ENABLE_DOLPHIN_RUNTIME)
+     target_sources(moderngekko PRIVATE
+         src/runtime/dolphin_runtime.cpp

@@ -1,0 +1,20 @@
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp
+@@ -185,8 +185,14 @@
+     return;
+   }
+ 
+-  const u32 total_instructions = (ram_size + exram_size + fake_vmem_size) >> 2;
+-  m_chunk_lookup_table.assign(total_instructions, -1);
++  // Addresses above the last mapped chunk already miss the bounds checks in the lookup.
++  int last_mapped_index = -1;
++  for (u32 i = 0; i < m_module->num_chunk_ranges; ++i)
++  {
++    last_mapped_index =
++        std::max(last_mapped_index, GetAddressLookupIndex(m_module->chunk_ranges[i].end - 4u));
++  }
++  m_chunk_lookup_table.assign(static_cast<std::size_t>(last_mapped_index + 1), -1);
+ 
+   for (u32 i = 0; i < m_module->num_chunk_ranges; ++i)
+   {

@@ -35,12 +35,15 @@ def main():
             raise SystemExit(f'Source revision does not match dependencies.lock.json: {directory.name}')
     apply_patch(source, 'moderngekko-auto-gamepad.patch')
     apply_patch(source, 'moderngekko-no-empty-mod-hooks.patch')
-    apply_patch(source, 'moderngekko-disc-pair.patch')
+    apply_patch(source, 'moderngekko-skip-duplicate-game-inspection.patch',
+                after=('moderngekko-disc-pair.patch',))
     apply_patch(source, 'moderngekko-automatic-display.patch')
     apply_patch(source, 'moderngekko-direct3d11-settings.patch')
     apply_patch(source, 'moderngekko-title-game-speed.patch')
     apply_patch(source, 'moderngekko-windows-utf8-paths.patch')
     apply_patch(source, 'moderngekko-create-shader-cache.patch')
+    apply_patch(source, 'moderngekko-cache-asset-relative-paths.patch',
+                after=('moderngekko-windows-asset-hash.patch',))
     apply_patch(source, 'moderngekko-automation-load-result.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch',
                 after=('recompcore-auto-gamepad.patch',))
@@ -49,7 +52,8 @@ def main():
                 after=('recompcore-win32-window-teardown.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-fastmem.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-linking.patch')
-    apply_patch(source / 'vendor/dolphin', 'recompcore-verified-virtual-code.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-trim-native-chunk-lookup.patch',
+                after=('recompcore-verified-virtual-code.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-cache-dispatch.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-cache-bat-translation.patch',
                 after=('recompcore-cache-instruction-hook.patch',))

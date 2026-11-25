@@ -369,6 +369,43 @@ The 25-second cache-building replays also reached 100% median game speed with ze
 
 The dev.21 Direct3D 11 setting also passed two 22-second windowed replays at 4× with Cubeb and a warm shader cache. The Disc 1 Underground Passage flashback reached 100.0% median and 96.9% minimum game speed. The Disc 2 Hind fight reached 100.1% median and 99.7% minimum. Windows loopback reported zero packet discontinuities and zero gaps over 2 ms among packets with valid timestamps in both captures. Both runs shut down normally.
 
+### Profile-guided C module compilation
+
+Clang 23.1.1 instrumented the boot module using `-fprofile-generate`. Three 24-second training replays covered the Dock, Tower A and the Underground Passage flashback. I merged the profiles with the bundled `llvm-profdata` and compiled the same generated C with `-fprofile-use`. The profile, generated sources and modules stayed local. [Clang profile-guided optimization](https://clang.llvm.org/docs/UsersManual.html#profile-guided-optimization)
+
+Eight headless replays used the dev.22 runtime and shared CPU and video threads. The Windows sampler measured emulation-thread CPU time per video update. Each pair reversed the run order. All eight runs reached 100% median game speed and shut down normally.
+
+| Checkpoint | Measured window | Reference → PGO, reference first | Reference → PGO, PGO first |
+| --- | ---: | ---: | ---: |
+| Tower A | 36 s | 14.977 → 14.346 ms (4.2% lower) | 14.829 → 14.429 ms (2.7% lower) |
+| Heliport, excluded from training | 30 s | 11.611 → 11.281 ms (2.8% lower) | 11.487 → 11.148 ms (3.0% lower) |
+
+Separate headless replays matched the standard module sample for sample across 26.493 seconds of dialogue DSP output and 26.508 seconds of Hind fight DSP output. The disc streaming tracks also matched over their overlapping durations. The optimized DLL grew from 9,711,616 to 10,122,752 bytes.
+
+The measurements isolate CPU cost on this machine. Easy Setup builds the standard module. The profile-guided build requires separate training and a second compilation.
+
+### Native chunk lookup allocation
+
+The runtime sizes the chunk lookup to the last mapped chunk. Existing bounds checks send addresses beyond the lookup to the usual fallback. The supported boot module uses 401,984 bytes for the lookup, down from 25,165,824 bytes. The experimental boot-plus-REL module uses about 11.64 MiB less for that lookup.
+
+Four 32-second headless Tower A replays reached 100% median game speed with clean shutdown. Emulation-thread CPU cost ranged from 15.74 to 15.83 ms per video update across both builds. A separate Heliport replay with each runner recorded native dispatch inside the extended virtual memory region of the experimental module. Both full-module runs were below full game speed.
+
+### Runtime launch inspection
+
+The prepared launcher supplies an explicit native module. The runner now leaves full game and asset inspection to runtime creation on that path. Module discovery, netplay and builds with compile-time pinned checks still inspect before selecting or checking a module. Isolating this change reduced Disc 1 headless startup from 23.56 seconds to 12.54–12.57 seconds and Disc 2 from 24.31–24.56 seconds to 13.03–13.04 seconds.
+
+Caching each asset's relative path before sorting avoids repeated filesystem resolution in the comparator. On Windows the scan also uses the operating system's SHA-256 provider when available, with the portable implementation retained as a fallback. Both retail asset manifests matched the original scan exactly. Tests also compared 13 synthetic file sizes, empty files, filenames containing non-ASCII characters and nested trees created in different orders. A standalone scan went from 11.79–11.88 seconds to 2.35–2.51 seconds in the order-reversed comparison. [Windows SHA-256 API](https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcrypthash)
+
+Paired runs on the same prepared data used dev.22 and the combined candidate. Startup measures process creation through the first poll that observes an advancing frame. Each pair reversed the run order. All headless runs reached 100% median game speed over the five-second sample and shut down normally.
+
+| Disc and renderer | Dev.22 | Combined candidate |
+| --- | ---: | ---: |
+| Disc 1, Null | 24.06–24.56 s | 4.02–4.31 s |
+| Disc 2, Null | 26.59–26.82 s | 4.27 s |
+| Disc 1, offscreen Vulkan, warm shader cache | 24.31–27.32 s | 5.02–5.77 s |
+
+The candidate also booted through normal module discovery and through the `STATICRECOMP_MODULE` override. Unreadable assets, malformed boot metadata and a missing game root still failed with the invalid-game exit code. An unavailable explicit module failed with the module initialization exit code.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
@@ -430,7 +467,7 @@ PowerPC instruction fingerprints identified the matching SDK routines in the USA
 | `PADRead` reads controller state | 59.94 Hz | 59.94 Hz |
 | The traced engine viewport call sets up the draw | 29.97 Hz | 59.93 Hz |
 
-The same engine viewport call site tracked the display-copy cadence in both scenes. The probe also saw multiple perspective and orthographic projection uploads per displayed frame. The camera and animation code that produces the transforms still needs tracing. [PAL SDK symbol reference](https://github.com/alphanu1/msg-twinsnakes-recomp/blob/d1fbfec2281042d2eaef43dbb20afedb0ae1d364/config/symbols/main.dol.symbols.txt)
+The same engine viewport call site tracked the display-copy cadence in both scenes. Four perspective upload sites also followed roughly 30 Hz in dialogue and 60 Hz at the Dock. In a follow-up trace, one overlay call site built a view matrix into the same destination in both scenes. For that destination, the median interval was 33.369 ms across 372 calls in dialogue and 16.679 ms across 740 calls at the Dock. In dialogue the same call site also built matrices into a second destination twice per update. The USA matrix routine matches the PAL `C_MTXLookAt` symbol position relative to neighboring SDK functions and calls the expected vector normalization and cross-product helpers. Animation and camera-input update rates still need separate traces. [PAL SDK symbol reference](https://github.com/alphanu1/msg-twinsnakes-recomp/blob/d1fbfec2281042d2eaef43dbb20afedb0ae1d364/config/symbols/main.dol.symbols.txt) [libogc view-matrix API](https://github.com/devkitPro/libogc/blob/master/gc/ogc/gu.h)
 
 Prototype rendering directly from camera and animation evaluated at the presentation cadence, where the game's data supports it. Start with a known gameplay replay and an in-engine dialogue scene. Keep the original physics and script update schedule and audio clock, and verify motion, camera cuts, and dialogue timing with repeatable input. A higher simulation rate would require validating each frame-dependent update and callback. Keep the original guest speed limit during these experiments.
 

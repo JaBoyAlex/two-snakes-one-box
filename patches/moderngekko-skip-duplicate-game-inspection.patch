@@ -1,0 +1,117 @@
+diff --git a/tools/moderngekko_run.cpp b/tools/moderngekko_run.cpp
+--- a/tools/moderngekko_run.cpp
++++ b/tools/moderngekko_run.cpp
+@@ -288,45 +288,58 @@
+   if (dol_changed)
+     std::cout << "Applied native DOL patches\n";
+ #endif
+-  const auto inspected = moderngekko::InspectGame(config.game_root);
+-  if (!inspected) {
+-    std::cerr << "invalid game: " << inspected.error << '\n';
+-    return 2;
+-  }
+-
+-#ifdef MODERNGEKKO_REQUIRED_DISC_ID
+-  if (inspected.metadata->disc_id != MODERNGEKKO_REQUIRED_DISC_ID) {
+-    std::cerr << "unsupported disc ID: expected "
+-              << MODERNGEKKO_REQUIRED_DISC_ID << ", got "
+-              << inspected.metadata->disc_id << '\n';
+-    return 2;
+-  }
+-#endif
+-#ifdef MODERNGEKKO_REQUIRED_DOL_SHA256
+-  if (inspected.metadata->dol_sha256 != MODERNGEKKO_REQUIRED_DOL_SHA256) {
+-    std::cerr << "unsupported main DOL: this release requires its pinned game build\n";
+-    return 2;
+-  }
+-#endif
+-#ifdef MODERNGEKKO_REQUIRED_REL_SHA256
+-  if (inspected.metadata->rel_sha256 != MODERNGEKKO_REQUIRED_REL_SHA256) {
+-    std::cerr << "unsupported _Main.rel: this release requires its pinned game build\n";
+-    return 2;
+-  }
+-#endif
+-#ifdef MODERNGEKKO_REQUIRED_ASSETS_SHA256
+-  if (inspected.metadata->assets_sha256 !=
+-      MODERNGEKKO_REQUIRED_ASSETS_SHA256) {
+-    std::cerr << "unsupported game assets: this release requires its pinned game build\n";
+-    return 2;
+-  }
+-#endif
+-
+-  // Compatibility discovery belongs to the runner, never the runtime library.
++  bool discover_module = false;
+   if (module_path.empty()) {
+     if (const char *env = std::getenv("STATICRECOMP_MODULE"))
+       module_path = env;
+-    else {
++    else
++      discover_module = true;
++  }
++
++#if defined(MODERNGEKKO_REQUIRED_DISC_ID) || defined(MODERNGEKKO_REQUIRED_DOL_SHA256) || \
++    defined(MODERNGEKKO_REQUIRED_REL_SHA256) || defined(MODERNGEKKO_REQUIRED_ASSETS_SHA256)
++  const bool inspect_game = true;
++#else
++  const bool inspect_game = discover_module || netplay_role.has_value();
++#endif
++
++  // With an explicit module, ordinary local play can use Runtime::Create's validation.
++  if (inspect_game) {
++    const auto inspected = moderngekko::InspectGame(config.game_root);
++    if (!inspected) {
++      std::cerr << "invalid game: " << inspected.error << '\n';
++      return 2;
++    }
++
++#ifdef MODERNGEKKO_REQUIRED_DISC_ID
++    if (inspected.metadata->disc_id != MODERNGEKKO_REQUIRED_DISC_ID) {
++      std::cerr << "unsupported disc ID: expected "
++                << MODERNGEKKO_REQUIRED_DISC_ID << ", got "
++                << inspected.metadata->disc_id << '\n';
++      return 2;
++    }
++#endif
++#ifdef MODERNGEKKO_REQUIRED_DOL_SHA256
++    if (inspected.metadata->dol_sha256 != MODERNGEKKO_REQUIRED_DOL_SHA256) {
++      std::cerr << "unsupported main DOL: this release requires its pinned game build\n";
++      return 2;
++    }
++#endif
++#ifdef MODERNGEKKO_REQUIRED_REL_SHA256
++    if (inspected.metadata->rel_sha256 != MODERNGEKKO_REQUIRED_REL_SHA256) {
++      std::cerr << "unsupported _Main.rel: this release requires its pinned game build\n";
++      return 2;
++    }
++#endif
++#ifdef MODERNGEKKO_REQUIRED_ASSETS_SHA256
++    if (inspected.metadata->assets_sha256 !=
++        MODERNGEKKO_REQUIRED_ASSETS_SHA256) {
++      std::cerr << "unsupported game assets: this release requires its pinned game build\n";
++      return 2;
++    }
++#endif
++
++    if (discover_module) {
+       const std::string module_name =
+           "g" + inspected.metadata->disc_id + "_recomp" + LibrarySuffix();
+       const auto bundled = executable_directory / module_name;
+@@ -338,6 +351,7 @@
+         module_path = user_module;
+     }
+   }
++
+   if (!module_path.empty())
+     config.module =
+         moderngekko::ModuleSource::DynamicPath(std::move(module_path));
+@@ -405,6 +419,10 @@
+ 
+   auto created = moderngekko::Runtime::Create(std::move(config));
+   if (!created) {
++    if (created.error->code == moderngekko::RuntimeErrorCode::InvalidGame) {
++      std::cerr << "invalid game: " << created.error->message << '\n';
++      return 2;
++    }
+     std::cerr << "initialization failed: " << created.error->message << '\n';
+     return 1;
+   }
