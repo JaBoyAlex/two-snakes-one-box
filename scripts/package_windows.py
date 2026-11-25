@@ -11,6 +11,24 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 VC_FILES = ['msvcp140.dll', 'msvcp140_atomic_wait.dll', 'vcruntime140.dll', 'vcruntime140_1.dll']
+PRIVATE_DIRECTORIES = {'.local', 'recompdata', 'statesaves'}
+PRIVATE_RUNTIME_DIRECTORIES = PRIVATE_DIRECTORIES | {'cache', 'dump', 'generated', 'logs', 'saves', 'user'}
+PRIVATE_SUFFIXES = {
+    '.iso', '.gcm', '.rvz', '.gcz', '.dol', '.rel', '.gci', '.raw', '.sav',
+    '.log', '.dmp', '.trace', '.profraw', '.profdata',
+}
+
+
+def check_package_tree(root, *, runtime=False):
+    for path in root.rglob('*'):
+        relative = path.relative_to(root)
+        in_runtime = runtime or relative.parts[0].casefold() == 'runtime'
+        private_directories = PRIVATE_RUNTIME_DIRECTORIES if in_runtime else PRIVATE_DIRECTORIES
+        if any(part.casefold() in private_directories for part in relative.parts):
+            raise SystemExit(f'Private path in package input: {relative.as_posix()}')
+        if path.is_file() and (path.suffix.casefold() in PRIVATE_SUFFIXES
+                               or path.name.casefold().endswith('_recomp.dll')):
+            raise SystemExit(f'Private file in package input: {relative.as_posix()}')
 
 
 def main():
@@ -39,6 +57,7 @@ def main():
                      args.tools / 'llvm-mingw/bin/clang.exe']:
         if not required.is_file():
             raise SystemExit(f'Missing package input: {required}')
+    check_package_tree(args.runtime, runtime=True)
     stage = args.staging_root.resolve() / args.version
     if stage.exists():
         raise SystemExit('Use a new package version or remove the old staging directory after reviewing it.')
@@ -58,12 +77,7 @@ def main():
     for name in ['cmake', 'ninja', 'llvm-mingw']:
         shutil.copytree(args.tools / name, stage / 'tools' / name)
     (stage / 'portable.txt').touch()
-    # No generated module, ROM, memory-card or player-data directory may enter
-    # the archive. Runtime resources and source SDK are explicit inputs above.
-    blocked_suffixes = {'.iso', '.gcm', '.rvz', '.gcz', '.dol', '.rel', '.gci', '.raw', '.sav'}
-    for path in stage.rglob('*'):
-        if path.is_file() and (path.suffix.lower() in blocked_suffixes or '_recomp.dll' in path.name):
-            raise SystemExit(f'Private content in package staging: {path.relative_to(stage)}')
+    check_package_tree(stage)
     manifest = {}
     for path in sorted(stage.rglob('*')):
         if path.is_file():

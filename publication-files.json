@@ -64,6 +64,7 @@
   "docs/STATUS.md",
   "docs/PERFORMANCE.md",
   "tests/test_discs.py",
+  "tests/test_package_windows.py",
   "tests/test_prepare.py",
   "tests/test_rel_image.py"
 ]
