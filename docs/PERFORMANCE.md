@@ -46,6 +46,8 @@ Use `--compare-threading` to run shared and separate CPU/video threads in both o
 
 Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay. Benchmark profiles and logs default to a subdirectory of the system temporary directory. Use `--output PATH` to retain traces elsewhere. One run in a synced workspace failed to replace the test profile's filesystem metadata (`IOS_FS: Failed to rename temporary FST file`). Repeat runs with isolated profiles outside the synced workspace completed successfully.
 
+For an order-reversed graphics comparison, pair `--windowed Vulkan` with `--compare-backend D3D`. Use `--offscreen Vulkan` for a headless rendering comparison with audio output disabled. Each leg starts from its own profile. To compare warm runs, pass a `--shader-cache-seed` containing cache files for both backends.
+
 A later Windows test reproduced that warning by holding the existing `fst.bin` without delete sharing. A source handle returned error 32 during an atomic replacement. A destination handle returned error 5. The runtime retries those two errors when committing IOS metadata. Releasing the destination lock after 22 ms let the game boot and shut down normally. Native controls held both kinds of lock through the retry sequence and verified that the existing and temporary files survived. [Windows file sharing](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew)
 
 To compare display settings, use `--windowed Vulkan --fullscreen --frame-times` and repeat the same checkpoint with `--internal-scale 1` and `--internal-scale 4`. Fullscreen sets the presentation surface to the current monitor's desktop size. Internal scale controls the GameCube render targets independently. The Windows test runtime opened directly with a 2560 × 1440 client area, restored its windowed geometry, and returned to a 2560 × 1440 client area. Other monitors, DPI settings, HUD placement, and graphics effects remain to be checked.
@@ -460,6 +462,19 @@ Both windowed runs restored the same Disc 2 Tower A alarm checkpoint before samp
 
 The comparison covers one matched run per backend on a GeForce RTX 3060 Ti. Listening quality and the cause of the short Vulkan dips still need separate checks.
 
+### Dev.28 Tower A after a clean source build
+
+All four windowed replays restored the same Disc 2 Tower A checkpoint and ran for 35 seconds at 4× with Cubeb and shared CPU and video threads. The comparison reversed the order of the two backends. Each leg used its own profile and started with the same dev.25 shader cache seed. All four runs reached 100% median game speed and exited normally.
+
+| Backend and order | Minimum game speed | Samples below 95% | Maximum render / vertical blank interval |
+| --- | ---: | ---: | ---: |
+| Vulkan first | 99.7% | 0 / 141 | 35.27 / 21.60 ms |
+| Direct3D 11 second | 99.7% | 0 / 140 | 38.70 / 22.13 ms |
+| Direct3D 11 first | 99.8% | 0 / 141 | 39.16 / 22.71 ms |
+| Vulkan second | 99.7% | 0 / 140 | 36.32 / 22.13 ms |
+
+Vulkan reached the first advancing frame in 4.26–4.52 seconds. Direct3D 11 took 24.29–24.72 seconds and regenerated its shader files. The old Direct3D 11 cache header contained a fallback version string. The new runtime records the RecompCore Git revision, and its disk cache requires the revision to match. Frame sampling started after startup and checkpoint restore. These results cover the same checkpoint and graphics card as the dev.25 comparison.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
@@ -497,6 +512,17 @@ A private cache-line trial reused the fallback JIT's single-line invalidation pa
 A Windows instruction-pointer sample of the busiest thread during the same headless gameplay replay landed inside the full native module 408 times out of 574. Paired-single load, store, and multiply-add helpers were among the busiest named symbols. The stock JIT reached `1.000` median speed on that replay. The full C module reached `0.420` in an uninstrumented repeat and `0.413` with the sampler attached. Runtime profiles, binaries, and instruction addresses stayed local.
 
 A private trial replaced the module's CRT fused multiply-add call with a hardware FMA instruction on the i5-11400. Two runs per build in alternating order measured `0.423` and `0.421` for the reference and `0.419` and `0.406` for the trial, with 33 samples per run and clean exits. Keep the existing floating-point path. The profile points to several hot helpers and large generated chunks. Evaluate code layout and register-state traffic before tuning individual floating-point calls further.
+
+A separate paired-single trial replaced the power-of-two calls in quantized loads and stores with exact single-precision scale constants. The comparison matched all 6,291,456 tested load conversions and 3,075,072 tested store conversions, including signed and unsigned types, edge inputs and the full scale range. A synthetic loop ran about three times faster on the CPU.
+
+Four headless runs per checkpoint alternated the reference and candidate modules on the dev.26 runner. CPU time uses the same range of advancing guest video frames in each run. Dispatch samples confirmed native REL execution and all eight runs exited normally.
+
+| Checkpoint | Matched frames | Reference → candidate, reference first | Reference → candidate, candidate first | Candidate median game speed |
+| --- | ---: | ---: | ---: | ---: |
+| Disc 1 Heliport | 1,463 | 20.213 → 19.481 ms/frame | 19.466 → 19.558 ms/frame | 85.6–85.7% |
+| Disc 2 Tower A | 1,078 | 22.910 → 22.808 ms/frame | 23.133 → 22.627 ms/frame | 72.8–73.1% |
+
+The improvement was small in Tower A and varied with run order at the Heliport. The trial remains private. The regular build continues to use the native boot module with JIT gameplay fallback.
 
 GekkoAOT already compiles secondary modules and translates between compile-time and live addresses. Its standalone ABI is different from the current runtime's. The local DOL passed its ABI probe. REL linking and gameplay are still unverified in that tool.
 

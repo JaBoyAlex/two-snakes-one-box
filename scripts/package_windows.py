@@ -76,15 +76,18 @@ def main():
     for name in VC_FILES:
         shutil.copy2(vc_runtime / name, stage / 'runtime' / name)
     shutil.copytree(args.tools / 'python', stage / 'python')
-    cmake = args.tools / 'cmake'
+    omitted_directories = {
+        # CMake's CLI help lives under share. Keep the notices in doc/cmake.
+        'cmake/doc/cmake': ('html',),
+        # The package builds and loads x64 game modules on Windows.
+        'llvm-mingw': ('aarch64-w64-mingw32', 'armv7-w64-mingw32', 'i686-w64-mingw32'),
+    }
 
-    def omit_cmake_html(folder, _entries):
-        # The CLI uses the help tree under share. Keep doc/cmake's license notices.
-        return ('html',) if Path(folder) == cmake / 'doc/cmake' else ()
+    def omit_unused_directories(folder, _entries):
+        return omitted_directories.get(Path(folder).relative_to(args.tools).as_posix(), ())
 
-    shutil.copytree(cmake, stage / 'tools/cmake', ignore=omit_cmake_html)
-    for name in ['ninja', 'llvm-mingw']:
-        shutil.copytree(args.tools / name, stage / 'tools' / name)
+    for name in ['cmake', 'ninja', 'llvm-mingw']:
+        shutil.copytree(args.tools / name, stage / 'tools' / name, ignore=omit_unused_directories)
     (stage / 'portable.txt').touch()
     check_package_tree(stage)
     manifest = {}

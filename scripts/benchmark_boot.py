@@ -1,4 +1,4 @@
-"""Benchmark CPU modes, runners and native modules with isolated runtime settings."""
+"""Benchmark CPU modes, graphics backends, runners and modules in isolated profiles."""
 import argparse
 import json
 import math
@@ -196,6 +196,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    backends = ['Vulkan', 'D3D', 'D3D12']
     parser.add_argument('--data', required=True, type=Path)
     parser.add_argument('--runner', required=True, type=Path)
     parser.add_argument('--module', type=Path, help='Test a candidate module instead of the prepared module')
@@ -206,6 +207,8 @@ def main():
                             help='Compare a candidate against --runner in both run orders')
     comparison.add_argument('--compare-threading', action='store_true',
                             help='Compare shared and separate CPU/video threads in both run orders')
+    comparison.add_argument('--compare-backend', choices=backends,
+                            help='Compare another graphics backend in both run orders')
     parser.add_argument('--disc', type=int, choices=[1, 2], default=1,
                         help='Boot the selected prepared disc (default: 1)')
     parser.add_argument('--load-state', type=Path, help='Replay a local save state for the selected disc')
@@ -222,9 +225,8 @@ def main():
                         help='Integer EFB render scale in the isolated profile, from 1 to 12 (default: 1)')
     parser.add_argument('--fullscreen', action='store_true', help='Start the windowed benchmark in borderless fullscreen')
     parser.add_argument('--mode', choices=['aot', 'jit', 'both'],
-                        help='Default: both, or aot when comparing runners or modules')
+                        help='Default: both, or aot in a comparison')
     display = parser.add_mutually_exclusive_group()
-    backends = ['Vulkan', 'D3D', 'D3D12']
     display.add_argument('--windowed', nargs='?', const='Vulkan', choices=backends,
                          help='Use a visible window and normal audio (default backend: Vulkan)')
     display.add_argument('--offscreen', choices=backends,
@@ -242,6 +244,9 @@ def main():
         parser.error('--compare-runner requires a single CPU mode')
     if args.compare_threading and (args.dual_core or args.mode == 'both'):
         parser.error('--compare-threading requires a single CPU mode and cannot be combined with --dual-core')
+    backend = args.windowed or args.offscreen or 'Null'
+    if args.compare_backend and (backend in ('Null', args.compare_backend) or args.mode == 'both'):
+        parser.error('--compare-backend requires a different --windowed or --offscreen backend and a single CPU mode')
     windowed = args.windowed is not None
     if args.frame_times and not windowed:
         parser.error('--frame-times requires --windowed')
@@ -268,29 +273,33 @@ def main():
     load_state = args.load_state.resolve(strict=True) if args.load_state else None
     work = (output / str(time.time_ns()) if output else
             Path(tempfile.mkdtemp(prefix='TwinSnakesRecompBenchmark-')))
-    backend = args.windowed or args.offscreen or 'Null'
     if args.compare_module or args.compare_runner:
         mode = args.mode or 'aot'
         candidate_module = args.compare_module.resolve(strict=True) if args.compare_module else module
         candidate_runner = args.compare_runner.resolve(strict=True) if args.compare_runner else runner
-        cases = [('reference-first', mode, runner, module, args.dual_core),
-                 ('candidate-second', mode, candidate_runner, candidate_module, args.dual_core),
-                 ('candidate-first', mode, candidate_runner, candidate_module, args.dual_core),
-                 ('reference-second', mode, runner, module, args.dual_core)]
+        cases = [('reference-first', mode, runner, module, args.dual_core, backend),
+                 ('candidate-second', mode, candidate_runner, candidate_module, args.dual_core, backend),
+                 ('candidate-first', mode, candidate_runner, candidate_module, args.dual_core, backend),
+                 ('reference-second', mode, runner, module, args.dual_core, backend)]
     elif args.compare_threading:
         mode = args.mode or 'aot'
-        cases = [('shared-first', mode, runner, module, False),
-                 ('separate-second', mode, runner, module, True),
-                 ('separate-first', mode, runner, module, True),
-                 ('shared-second', mode, runner, module, False)]
+        cases = [('shared-first', mode, runner, module, False, backend),
+                 ('separate-second', mode, runner, module, True, backend),
+                 ('separate-first', mode, runner, module, True, backend),
+                 ('shared-second', mode, runner, module, False, backend)]
+    elif args.compare_backend:
+        mode = args.mode or 'aot'
+        cases = [(f'{graphics.lower()}-{order}', mode, runner, module, args.dual_core, graphics)
+                 for graphics, order in [(backend, 'first'), (args.compare_backend, 'second'),
+                                         (args.compare_backend, 'first'), (backend, 'second')]]
     else:
         modes = ['jit', 'aot'] if args.mode in (None, 'both') else [args.mode]
-        cases = [(mode, mode, runner, module, args.dual_core) for mode in modes]
+        cases = [(mode, mode, runner, module, args.dual_core, backend) for mode in modes]
     outcomes = []
-    for label, mode, selected_runner, selected_module, dual_core in cases:
+    for label, mode, selected_runner, selected_module, dual_core, graphics in cases:
         print(f'Running {label}', flush=True)
         outcomes.append(benchmark(mode, selected_runner, data / disc['root'], selected_module,
-                                  work / label, windowed, backend, args.seconds,
+                                  work / label, windowed, graphics, args.seconds,
                                   load_state, args.dispatch_samples, dual_core=dual_core,
                                   frame_times=args.frame_times, internal_scale=args.internal_scale,
                                   fullscreen=args.fullscreen, alternate_disc=alternate_disc,
