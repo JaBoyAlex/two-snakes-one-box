@@ -188,9 +188,14 @@ def compiler_environment(runtime):
     return env, cmake, compiler
 
 
-def verify_extraction(extracted, disc, rel_layout):
+def supported_profile(game_id, revision):
+    builds = json.loads((ROOT / 'supported-builds.json').read_text(encoding='utf-8'))['builds']
+    return next((build for build in builds if (build['game_id'], build['revision']) == (game_id, revision)), None)
+
+
+def verify_extraction(extracted, dol_sha256, rel_layout):
     dol = extracted / 'sys/main.dol'
-    if not file_matches(dol, disc.dol_sha256):
+    if not file_matches(dol, dol_sha256):
         raise DiscError('Extracted executable does not match the selected disc.')
     if rel_layout:
         rel = extracted / rel_layout['path']
@@ -198,9 +203,9 @@ def verify_extraction(extracted, disc, rel_layout):
             raise DiscError('Extracted game module does not match the verified revision.')
 
 
-def extraction_ready(extracted, disc, rel_layout):
+def extraction_ready(extracted, dol_sha256, rel_layout):
     try:
-        verify_extraction(extracted, disc, rel_layout)
+        verify_extraction(extracted, dol_sha256, rel_layout)
     except (FileNotFoundError, DiscError):
         return False
     return True
@@ -208,14 +213,14 @@ def extraction_ready(extracted, disc, rel_layout):
 
 def extract_disc(iso, disc, build, runtime, log, rel_layout):
     extracted = build / f'disc{disc.number + 1}'
-    if extraction_ready(extracted, disc, rel_layout):
+    if extraction_ready(extracted, disc.dol_sha256, rel_layout):
         return extracted
     build.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=f'{extracted.name}-', dir=build) as temp_dir:
         staging = Path(temp_dir) / 'fresh'
         staging.mkdir()
         run([tool(runtime, 'dolrecomp'), 'extract', iso, staging], log, code=20)
-        verify_extraction(staging, disc, rel_layout)
+        verify_extraction(staging, disc.dol_sha256, rel_layout)
         previous = Path(temp_dir) / 'previous'
         if extracted.exists():
             extracted.rename(previous)
@@ -241,7 +246,8 @@ def native_module_ready(module, *, allow_legacy=False):
     return isinstance(expected, str) and digest(module) == expected
 
 
-def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layout=None):
+def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layout=None,
+               experimental_rel=False):
     extracted = extract_disc(iso, disc, build, runtime, log, rel_layout)
     dol = extracted / 'sys/main.dol'
     module_build = build / 'modules' / disc.dol_sha256[:16]
@@ -253,7 +259,7 @@ def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layo
     generated_parent = build / 'generated' / disc.dol_sha256[:16]
     compiler_input = dol
     recompiler_options = ['--gamecube']
-    if rel_layout:
+    if experimental_rel:
         compiler_input = generated_parent / 'linked.dol'
         compiler_input.parent.mkdir(parents=True, exist_ok=True)
         compiler_input.write_bytes(link_rel_image(
@@ -309,21 +315,20 @@ def prepare(args, runtime, data, log):
     # Hash full content, not only main.dol: two images with different assets
     # must never share a prepared extraction or a completed-build marker.
     disc_hashes = [digest(iso1), digest(iso2)]
-    supported = json.loads((ROOT / 'supported-builds.json').read_text(encoding='utf-8'))['builds']
-    profile = next((p for p in supported if p['game_id'] == first.game_id and p['revision'] == first.revision), None)
+    profile = supported_profile(first.game_id, first.revision)
     if not profile:
         raise DiscError('This development build currently supports only the reference USA revision 0 pair.')
     if any(disc.dol_sha256 != profile['dol_sha256'] for disc in [first, second]):
         raise DiscError('The executable differs from the supported USA revision 0 build.')
     if disc_hashes != [entry['sha256'] for entry in profile['discs']]:
         raise DiscError('A disc differs from the supported reference dump. See supported-builds.json.')
-    rel_layout = profile['rel'] if args.experimental_rel else None
+    rel_layout = profile['rel']
     identity = {'format': BUILD_FORMAT, 'discs': disc_hashes,
                 'runtime': digest(runtime / 'dependencies.lock.json'),
                 'recompiler': digest(tool(runtime, 'dolrecomp')),
                 'runner': digest(tool(runtime, 'moderngekko-run')),
                 'host': platform.machine(), 'compiler': compiler}
-    if rel_layout:
+    if args.experimental_rel:
         identity['rel'] = rel_layout
     key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:32]
     build = cache / 'builds' / key
@@ -331,7 +336,7 @@ def prepare(args, runtime, data, log):
     if completed.is_file():
         record = json.loads(completed.read_text(encoding='utf-8'))
         if (record['identity'] == identity and len(record['discs']) == 2
-                and all(extraction_ready(data / entry['root'], disc, rel_layout)
+                and all(extraction_ready(data / entry['root'], disc.dol_sha256, rel_layout)
                         for entry, disc in zip(record['discs'], (first, second)))
                 and all(native_module_ready(module)
                         for module in {data / entry['module'] for entry in record['discs']})):
@@ -342,7 +347,7 @@ def prepare(args, runtime, data, log):
     for index, (iso, disc) in enumerate([(iso1, first), (iso2, second)]):
         progress(0.18 + index * 0.36, f'Extracting and compiling Disc {index + 1}')
         extracted, module = build_disc(iso, disc, build, runtime, env, cmake, compiler, log,
-                                       rel_layout=rel_layout)
+                                       rel_layout=rel_layout, experimental_rel=args.experimental_rel)
         results.append({'root': extracted.relative_to(data).as_posix(),
                         'dol': (extracted / 'sys/main.dol').relative_to(data).as_posix(),
                         'module': module.relative_to(data).as_posix(),
@@ -361,8 +366,12 @@ def play(args, runtime, data, log):
     record = json.loads(prepared.read_text(encoding='utf-8'))
     discs = record['discs']
     entry = discs[args.boot_disc - 1]
-    # Check both boot files before advertising an alternate disc to the runtime.
-    boot_files_ready = all(file_matches(data / disc['dol'], disc['metadata']['dol_sha256'])
+    metadata = entry['metadata']
+    profile = supported_profile(metadata.get('game_id'), metadata.get('revision'))
+    rel_layout = profile['rel'] if profile else None
+    # Check the executable and gameplay module on both discs before launching.
+    boot_files_ready = all(data / disc['dol'] == data / disc['root'] / 'sys/main.dol'
+                           and extraction_ready(data / disc['root'], disc['metadata']['dol_sha256'], rel_layout)
                            for disc in discs)
     modules_ready = args.allow_interpreter or all(native_module_ready(module, allow_legacy=True)
                                                   for module in {data / disc['module'] for disc in discs})

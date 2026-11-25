@@ -89,12 +89,17 @@ class PrepareTests(unittest.TestCase):
         self.assertEqual(list(self.build.iterdir()), [extracted])
 
     def test_link_retry_does_not_reuse_partial_native_output(self):
-        self.write_extraction(self.build / 'disc1')
+        extracted = self.build / 'disc1'
+        self.write_extraction(extracted)
+        rel_bytes = b'test REL'
+        rel_layout = {'path': 'game.rel', 'sha256': hashlib.sha256(rel_bytes).hexdigest()}
+        (extracted / rel_layout['path']).write_bytes(rel_bytes)
         attempts = 0
 
         def compile_module(command, *_args, **_kwargs):
             nonlocal attempts
             if command[1] == '--gamecube':
+                self.assertEqual(command[2], extracted / 'sys/main.dol')
                 (command[-1] / 'generated').mkdir(parents=True, exist_ok=True)
             elif command[1] == '--build':
                 attempts += 1
@@ -111,10 +116,10 @@ class PrepareTests(unittest.TestCase):
         args = (None, self.disc, self.build, self.root, {}, 'cmake', 'cc', None)
         with patch.object(twin_snakes, 'run', side_effect=compile_module):
             with self.assertRaises(twin_snakes.SetupError):
-                twin_snakes.build_disc(*args)
-            _, module = twin_snakes.build_disc(*args)
+                twin_snakes.build_disc(*args, rel_layout=rel_layout)
+            _, module = twin_snakes.build_disc(*args, rel_layout=rel_layout)
             self.assertEqual(module.read_bytes(), b'linked output')
-            self.assertEqual(twin_snakes.build_disc(*args)[1], module)
+            self.assertEqual(twin_snakes.build_disc(*args, rel_layout=rel_layout)[1], module)
         self.assertEqual(attempts, 2)
 
     def test_rebuild_replaces_empty_module_with_stale_completion_record(self):
@@ -207,11 +212,16 @@ class PrepareTests(unittest.TestCase):
                 run.assert_called_once()
 
     def test_play_offers_setup_again_after_cache_damage(self):
+        rel_bytes = b'test REL'
+        rel_layout = {'path': 'game.rel', 'sha256': hashlib.sha256(rel_bytes).hexdigest()}
+        metadata = {'dol_sha256': self.disc.dol_sha256, 'game_id': 'GGSEA4', 'revision': 0}
         entries = []
         for number in (1, 2):
-            self.write_extraction(self.root / f'disc{number}')
+            extracted = self.root / f'disc{number}'
+            self.write_extraction(extracted)
+            (extracted / rel_layout['path']).write_bytes(rel_bytes)
             entries.append({'root': f'disc{number}', 'dol': f'disc{number}/sys/main.dol',
-                            'module': 'shared.dll', 'metadata': {'dol_sha256': self.disc.dol_sha256}})
+                            'module': 'shared.dll', 'metadata': metadata})
         module = self.root / 'shared.dll'
         good_module = b'linked output'
         module.write_bytes(good_module)
@@ -219,12 +229,15 @@ class PrepareTests(unittest.TestCase):
         active = self.root / 'prepared.json'
         args = SimpleNamespace(boot_disc=1, allow_interpreter=False, headless=True, automation_dir=None)
         for damaged, original, modified in [(self.root / entries[1]['dol'], b'test DOL', b'bad! DOL'),
+                                            (self.root / 'disc1/game.rel', rel_bytes, b'bad! REL'),
+                                            (self.root / 'disc2/game.rel', rel_bytes, b'bad! REL'),
                                             (module, good_module, b'broken bytes!')]:
-            with self.subTest(file=damaged.name):
+            with self.subTest(file=damaged.relative_to(self.root)):
                 twin_snakes.atomic_json(active, {'discs': entries})
                 original_record = active.read_bytes()
                 damaged.write_bytes(modified)
-                with patch.object(twin_snakes, 'run') as run:
+                with (patch.object(twin_snakes, 'run') as run,
+                      patch.object(twin_snakes, 'supported_profile', return_value={'rel': rel_layout})):
                     with self.assertRaisesRegex(twin_snakes.SetupError, 'Run setup again') as error:
                         twin_snakes.play(args, self.root, self.root, None)
                     self.assertEqual(error.exception.code, 27)
