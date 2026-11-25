@@ -1,0 +1,24 @@
+diff --git a/Source/Core/VideoCommon/Present.cpp b/Source/Core/VideoCommon/Present.cpp
+--- a/Source/Core/VideoCommon/Present.cpp
++++ b/Source/Core/VideoCommon/Present.cpp
+@@ -903,7 +903,19 @@ void Presenter::Present(PresentInfo* present_info)
+ {
+   m_present_count++;
+ 
+-  if (g_gfx->IsHeadless() || (!m_onscreen_ui && !m_xfb_entry))
++  if (g_gfx->IsHeadless())
++  {
++    // Without a swap chain, submit to Vulkan once per new guest frame so uploads
++    // do not have to wait for the stream buffer to fill before work is submitted.
++    if (g_backend_info.api_type == APIType::Vulkan && m_xfb_entry && present_info &&
++        present_info->reason != PresentInfo::PresentReason::VideoInterfaceDuplicate)
++    {
++      g_vertex_manager->Flush();
++      g_gfx->Flush();
++    }
++    return;
++  }
++  if (!m_onscreen_ui && !m_xfb_entry)
+     return;
+ 
+   if (!g_gfx->SupportsUtilityDrawing())

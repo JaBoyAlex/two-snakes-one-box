@@ -421,6 +421,25 @@ An instrumented runtime measured eight vertical blank gaps of at least 30 ms in 
 
 The 4× offscreen Vulkan Raven replay measured 118 vertical blank gaps of at least 30 ms. All 118 overlapped waits to reuse an upload buffer. The longest gap was 52.87 ms and included 37.74 ms in the buffer wait, almost all inside the Vulkan fence call. The renderer's offscreen path skips the regular windowed backbuffer submission. This makes GPU submission cadence a variable in offscreen comparisons. The user's visible window pauses require separate validation.
 
+### Offscreen Vulkan submission
+
+In four warm 28-second Raven replays at 4×, the vertex upload buffer accounted for all instrumented reuse waits. Two runs used the original submission cadence and two submitted GPU work once per new frame, with the order reversed for the second pair. Every run restored the checkpoint, held 100% median game speed and shut down normally.
+
+| Replay | Vertex upload waits of at least 5 ms | Vertical blank gaps of at least 30 ms | Longest gap |
+| --- | ---: | ---: | ---: |
+| Reference first | 95 | 96 | 73.07 ms |
+| Candidate second | 0 | 2 | 34.25 ms |
+| Candidate first | 0 | 1 | 32.57 ms |
+| Reference second | 95 | 95 | 50.23 ms |
+
+The automation status also formerly reported the internal presenter sequence number, which could advance twice within one present. The updated runner counts completed guest present callbacks directly. Estimates from the older counter measure changes in that sequence number. Rendered frame rate uses the separate unique-frame counter.
+
+The regular build, with the submission change and no diagnostic probes, held 100% median game speed in a 35-second Raven replay at 4× and a 12-second dialogue replay at 1×. It counted 59.64 drawn frames and present callbacks per second in the fight and 30.05 per second in dialogue. Both restored their checkpoints before sampling and shut down normally.
+
+### Cold Direct3D 11 shader startup
+
+Four clean-cache Disc 1 starts at 4× reached the first advancing frame in 29.20–29.59 seconds with automatic shader worker selection. Limiting shader precompilation to six workers took 30.64–30.88 seconds in the same order-reversed comparison. A warm Direct3D 11 run reached the first advancing frame in 4.77 seconds. The automatic worker count stays selected.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.

@@ -45,6 +45,7 @@ def main():
     apply_patch(source, 'moderngekko-cache-asset-relative-paths.patch',
                 after=('moderngekko-windows-asset-hash.patch',))
     apply_patch(source, 'moderngekko-automation-load-result.patch')
+    apply_patch(source, 'moderngekko-automation-present-count.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch',
                 after=('recompcore-auto-gamepad.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-empty-gamepad-config.patch')
@@ -60,6 +61,7 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-register-sync.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-x64-condition-register.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-headless-shader-progress.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-headless-vulkan-submit.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-disc-mount-log.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-disc-fst-capacity.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-savestate-disc-check.patch')

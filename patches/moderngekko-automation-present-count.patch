@@ -1,0 +1,19 @@
+diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
+--- a/src/runtime/dolphin_runtime.cpp
++++ b/src/runtime/dolphin_runtime.cpp
+@@ -833,12 +833,13 @@ RuntimeRunResult Runtime::Run() {
+                          "Dolphin could not boot sys/main.dol"}};
+   }
+   m_impl->booted = true;
++  m_impl->automation_state.frame_count.store(0, std::memory_order_relaxed);
++  m_impl->automation_state.present_count.store(0, std::memory_order_relaxed);
+   m_impl->present_hook =
+       GetVideoEvents().after_present_event.Register([this](const PresentInfo &info) {
+         m_impl->automation_state.frame_count.store(info.frame_count,
+                                                    std::memory_order_relaxed);
+-        m_impl->automation_state.present_count.store(info.present_count,
+-                                                     std::memory_order_relaxed);
++        m_impl->automation_state.present_count.fetch_add(1, std::memory_order_relaxed);
+       });
+   if (!m_impl->config.automation.directory.empty()) {
+     m_impl->automation_thread =
