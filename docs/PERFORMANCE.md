@@ -436,6 +436,15 @@ The automation status also formerly reported the internal presenter sequence num
 
 The regular build, with the submission change and no diagnostic probes, held 100% median game speed in a 35-second Raven replay at 4× and a 12-second dialogue replay at 1×. It counted 59.64 drawn frames and present callbacks per second in the fight and 30.05 per second in dialogue. Both restored their checkpoints before sampling and shut down normally.
 
+At 4× offscreen Vulkan, the updated runner produced 23.07 seconds of sample-identical DSP audio against the reference in dialogue and 24.14 seconds in the Raven fight. A second unchanged reference ran under overlapping host compilation load and produced a shorter matching interval. The updated build matched that entire interval in each scene, 18.26 and 18.50 seconds respectively. These are guest PCM comparisons. Windows audio output is measured separately.
+
+The dev.25 package also ran both checkpoints in normal windows with warm caches, 4× internal resolution and sound output disabled. Both confirmed the checkpoint load before sampling and shut down normally.
+
+| Checkpoint | Backend | Window | Median game speed | Samples below 95% speed | Maximum render / vertical blank interval |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Vulcan Raven fight | Vulkan | 38 s | 100% | 0 / 153 | 28.85 / 25.79 ms |
+| Tower A alarm | Direct3D 11 | 45 s | 100% | 4 / 181 | 39.15 / 33.35 ms |
+
 ### Cold Direct3D 11 shader startup
 
 Four clean-cache Disc 1 starts at 4× reached the first advancing frame in 29.20–29.59 seconds with automatic shader worker selection. Limiting shader precompilation to six workers took 30.64–30.88 seconds in the same order-reversed comparison. A warm Direct3D 11 run reached the first advancing frame in 4.77 seconds. The automatic worker count stays selected.
