@@ -66,10 +66,13 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                                    f'backend=Vulkan\nfullscreen={str(fullscreen).lower()}\n',
                                    encoding='ascii')
     config = user / 'Config'
-    if dual_core is not None or frame_times:
+    if dual_core is not None or frame_times or load_state:
         config.mkdir()
-    if dual_core is not None:
-        (config / 'Dolphin.ini').write_text(f'[Core]\nCPUThread = {dual_core}\n', encoding='ascii')
+    dolphin_settings = f'[Core]\nCPUThread = {dual_core}\n' if dual_core is not None else ''
+    if load_state:
+        dolphin_settings += '[Interface]\nUsePanicHandlers = False\n'
+    if dolphin_settings:
+        (config / 'Dolphin.ini').write_text(dolphin_settings, encoding='ascii')
     interval_logs = {}
     if frame_times:
         logs = user / 'Logs'
@@ -89,14 +92,16 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                '--graphics', backend, '--no-mods']
     if not windowed:
         command.append('--headless')
-    if load_state:
-        command += ['--load-state', str(load_state)]
+    checkpoint_command = 'load-checkpoint.txt'
 
     with (work / 'runtime.log').open('wb') as log:
         start = time.monotonic()
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=env)
+        booted_at = None
         began_sampling = None
-        previous_sample = None
+        checkpoint_error = None
+        sample_start = None
+        sample_end = None
         samples = []
         interval_start = {}
         interval_end = {}
@@ -109,30 +114,43 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                     state = dict(line.split('=', 1) for line in (control / 'status.txt').read_text().splitlines() if '=' in line)
                     speed = float(state['speed'])
                     frame = int(state['frame_count'])
+                    presents = int(state['present_count'])
                     if windowed:
                         vps = float(state['vps'])
                         fps = float(state['fps'])
                 except (OSError, ValueError, KeyError):
                     continue
                 now = time.monotonic()
+                if load_state and began_sampling is None:
+                    command_error = state.get('last_error', '')
+                    if command_error.startswith(checkpoint_command + ':'):
+                        checkpoint_error = command_error.split(':', 1)[1].strip()
+                        break
                 if (state.get('booted') != '1' or state.get('state') != 'running' or not frame
                         or not math.isfinite(speed)):
                     continue
+                if booted_at is None:
+                    booted_at = now
+                    if load_state:
+                        pending = control / 'load-checkpoint.tmp'
+                        pending.write_text(f'command=load_state\npath={load_state}\n', encoding='utf-8')
+                        pending.rename(command_dir / checkpoint_command)
                 if began_sampling is None:
+                    if load_state and state.get('last_command') != checkpoint_command:
+                        continue
                     began_sampling = now
-                if previous_sample is not None and now - began_sampling >= 3:
+                if now - began_sampling >= 3:
                     if not samples:
+                        sample_start = now, frame, presents
                         interval_start = {name: log_size(path) for name, path in interval_logs.items()}
-                    previous_time, previous_frame = previous_sample
-                    samples.append({'seconds_since_boot': round(now - began_sampling, 2),
-                                    'speed': speed,
-                                    'drawn_fps': (frame - previous_frame) / (now - previous_time)})
+                    sample_end = now, frame, presents
+                    samples.append({'seconds_since_boot': round(now - booted_at, 2), 'speed': speed,
+                                    'frame_count': frame, 'present_count': presents})
                     if windowed:
                         samples[-1].update({'vps': vps, 'fps': fps})
-                previous_sample = now, frame
                 if now - began_sampling >= seconds + 3:
                     interval_end = {name: log_size(path) for name, path in interval_logs.items()}
-                    completed = True
+                    completed = sample_end[2] > sample_start[2]
                     break
         finally:
             if process.poll() is None:
@@ -148,9 +166,13 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
 
     summary = {'cpu': mode, 'graphics': backend, 'headless': not windowed, 'exit_code': process.returncode,
                'completed': completed, 'forced_stop': forced_stop,
-               'startup_seconds': round(began_sampling - start, 2) if began_sampling is not None else None,
+               'startup_seconds': round(booted_at - start, 2) if booted_at is not None else None,
                'sample_count': len(samples), 'samples': samples,
                'internal_scale_requested': internal_scale, 'fullscreen_requested': fullscreen}
+    if load_state:
+        summary['checkpoint_ready_seconds'] = round(began_sampling - start, 2) if began_sampling is not None else None
+        if began_sampling is None:
+            summary['checkpoint_error'] = checkpoint_error or 'No successful load acknowledgement from the runtime'
     if dual_core is not None:
         summary['dual_core_requested'] = dual_core
     if frame_times and completed:
@@ -159,9 +181,13 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
             for name, path in interval_logs.items()
         }
     if samples:
-        metrics = ['drawn_fps', 'vps', 'fps'] if windowed else ['drawn_fps']
-        summary.update({f'median_{key}': round(statistics.median(sample[key] for sample in samples), 3)
-                        for key in metrics})
+        if windowed:
+            summary.update({f'median_{key}': round(statistics.median(sample[key] for sample in samples), 3)
+                            for key in ('vps', 'fps')})
+        if len(samples) > 1:
+            elapsed = sample_end[0] - sample_start[0]
+            summary['drawn_fps'] = round((sample_end[1] - sample_start[1]) / elapsed, 3)
+            summary['presents_per_second'] = round((sample_end[2] - sample_start[2]) / elapsed, 3)
         summary.update(summarize_speed(sample['speed'] for sample in samples))
     (work / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     print(json.dumps({key: value for key, value in summary.items() if key != 'samples'}), flush=True)

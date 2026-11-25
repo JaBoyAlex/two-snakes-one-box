@@ -38,9 +38,9 @@ The tester reported better pacing, including intervals close to normal speed, wi
 python scripts/benchmark_boot.py --data .local/player --runner .local/runtime/moderngekko-run.exe
 ```
 
-Use an idle machine and the same disc and scene for comparisons. Pass `--disc 2 --load-state PATH` for a checkpoint captured on Disc 2. The default headless run isolates the CPU path. `--offscreen Vulkan` (also `--offscreen-vulkan`) exercises rendering without a visible window or audio. `--windowed` adds display presentation and normal audio with Vulkan by default. Pass `D3D` for Direct3D 11 or `D3D12` for Direct3D 12 to either option. `--dual-core` enables separate CPU and video threads in the isolated benchmark profile. Add `--frame-times` to a windowed run for median, 95th-percentile and maximum render and vertical blank intervals after warmup. The runtime render counter includes repeated presents when they are enabled. These intervals measure runtime events. Use OS-level tracing to measure when frames reach the display. Generated outputs, logs and capture files stay local.
+Use an idle machine and the same disc and scene for comparisons. Pass `--disc 2 --load-state PATH` for a checkpoint captured on Disc 2. The default headless run isolates the CPU path. `--offscreen Vulkan` (also `--offscreen-vulkan`) exercises rendering without a visible window or audio. `--windowed` adds display presentation and normal audio with Vulkan by default. Pass `D3D` for Direct3D 11 or `D3D12` for Direct3D 12 to either option. `--dual-core` enables separate CPU and video threads in the isolated benchmark profile. Add `--frame-times` to a windowed run for median, 95th-percentile and maximum render and vertical blank intervals after warmup. Runtime presents can include multiple presentations of the same frame. These intervals measure runtime events. Use OS-level tracing to measure when frames reach the display. Generated outputs, logs and capture files stay local.
 
-The benchmark reports startup time from process launch to the first poll that observes a running core and an advanced frame counter. Use this measurement alongside the steady-state replay when comparing shader warmup or video backends.
+The benchmark reports startup time from process launch to the first poll that observes a running core and an advanced frame counter. For a replay it also reports when the runtime confirms the checkpoint load. A failed load produces no replay samples. Rendered frames and runtime presents use counter changes across the full measurement window, which reduces the effect of the status-file write interval on measured rates. Use these measurements alongside game speed when comparing shader warmup or video backends.
 
 Use `--compare-threading` to run shared and separate CPU/video threads in both orders against the same runner and checkpoint. It defaults to hybrid execution. With `--shader-cache-seed PATH`, every run starts with its own copy of the supplied local `Cache` directory. Seed from a completed run with the same backend and GPU so each case starts with the same pipeline data.
 
@@ -405,6 +405,17 @@ Paired runs on the same prepared data used dev.22 and the combined candidate. St
 | Disc 1, offscreen Vulkan, warm shader cache | 24.31–27.32 s | 5.02–5.77 s |
 
 The candidate also booted through normal module discovery and through the `STATICRECOMP_MODULE` override. Unreadable assets, malformed boot metadata and a missing game root still failed with the invalid-game exit code. An unavailable explicit module failed with the module initialization exit code.
+
+### Dev.23 checkpoint replays
+
+The updated benchmark waited for restoration to finish on the CPU thread. A truncated state and a tagged Disc 2 state on Disc 1 each produced zero replay samples. The tagged state loaded successfully on Disc 2. The sustained replays below used dev.23, the matching Disc 2 checkpoints, a warm cache for each backend and shared CPU and video threads. Both restored their checkpoint before sampling, used 4× offscreen rendering and exited normally.
+
+| Checkpoint | Backend | Window | Drawn frames per second | Game speed median / minimum | Samples below 95% speed |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Tower A alarm | Direct3D 11 | 65 s | 59.61 | 100% / 76.8% | 14 / 261 |
+| Vulcan Raven fight | Vulkan | 35 s | 59.05 | 100% / 55.8% | 5 / 141 |
+
+These runs cover different scenes, so a matched replay is needed to compare the backends. The short dips at both checkpoints remain open.
 
 ## Tool comparisons
 
