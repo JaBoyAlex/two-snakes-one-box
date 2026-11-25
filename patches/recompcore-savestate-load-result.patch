@@ -1,0 +1,58 @@
+diff --git a/Source/Core/Core/State.h b/Source/Core/Core/State.h
+--- a/Source/Core/Core/State.h
++++ b/Source/Core/Core/State.h
+@@ -96,7 +96,9 @@
+ void Load(Core::System& system, int slot);
+ 
+ void SaveAs(Core::System& system, std::string filename);
+-void LoadAs(Core::System& system, std::string filename);
++using LoadResultCallback = std::function<void(bool)>;
++// When supplied, the callback receives the result after the CPU thread finishes loading.
++void LoadAs(Core::System& system, std::string filename, LoadResultCallback on_complete = {});
+ 
+ void LoadLastSaved(Core::System& system, int i = 1);
+ void SaveFirstSaved(Core::System& system);
+diff --git a/Source/Core/Core/State.cpp b/Source/Core/Core/State.cpp
+--- a/Source/Core/Core/State.cpp
++++ b/Source/Core/Core/State.cpp
+@@ -329,7 +329,7 @@
+       });
+ }
+ 
+-static void LoadAsFromCore(Core::System& system, std::string filename)
++static bool LoadAsFromCore(Core::System& system, std::string filename)
+ {
+   s_compress_and_dump_thread.WaitForCompletion();
+ 
+@@ -383,16 +383,24 @@
+ 
+   if (s_on_after_load_callback)
+     s_on_after_load_callback();
+-}
+-
+-void LoadAs(Core::System& system, std::string filename)
++  return loaded_successfully;
++}
++
++void LoadAs(Core::System& system, std::string filename, LoadResultCallback on_complete)
+ {
+   if (!CheckIfStateLoadIsAllowed(system))
++  {
++    if (on_complete)
++      on_complete(false);
+     return;
+-
+-  Core::RunOnCPUThread(system, [&system, filename = std::move(filename)]() mutable {
+-    LoadAsFromCore(system, std::move(filename));
+-  });
++  }
++
++  Core::RunOnCPUThread(
++      system, [&system, filename = std::move(filename), on_complete = std::move(on_complete)]() mutable {
++        const bool loaded = LoadAsFromCore(system, std::move(filename));
++        if (on_complete)
++          on_complete(loaded);
++      });
+ }
+ 
+ void SetOnAfterLoadCallback(AfterLoadCallbackFunc callback)

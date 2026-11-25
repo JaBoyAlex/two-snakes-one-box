@@ -41,6 +41,7 @@ def main():
     apply_patch(source, 'moderngekko-title-game-speed.patch')
     apply_patch(source, 'moderngekko-windows-utf8-paths.patch')
     apply_patch(source, 'moderngekko-create-shader-cache.patch')
+    apply_patch(source, 'moderngekko-automation-load-result.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch',
                 after=('recompcore-auto-gamepad.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-empty-gamepad-config.patch')
@@ -58,6 +59,7 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-disc-mount-log.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-disc-fst-capacity.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-savestate-disc-check.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-savestate-load-result.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-twin-snakes-idle.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-llvm-region-check.patch')
     apply_patch(source / 'vendor/dolphin/DolRecomp', 'dolrecomp-win64-llvm-returns.patch')

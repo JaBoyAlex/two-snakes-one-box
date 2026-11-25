@@ -1,0 +1,38 @@
+diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
+--- a/src/runtime/dolphin_runtime.cpp
++++ b/src/runtime/dolphin_runtime.cpp
+@@ -44,6 +44,7 @@
+ #include <cstdlib>
+ #include <fstream>
+ #include <fmt/format.h>
++#include <future>
+ #include <mutex>
+ #include <stop_token>
+ #include <thread>
+@@ -337,8 +338,24 @@
+     State::SaveAs(system, command.path.string());
+     break;
+   case automation::CommandType::LoadState:
+-    State::LoadAs(system, command.path.string());
+-    break;
++  {
++    // State::LoadAs schedules work on the CPU thread. Report the outcome once it finishes.
++    auto completion = std::make_shared<std::promise<bool>>();
++    auto result = completion->get_future();
++    State::LoadAs(system, command.path.string(),
++                  [completion](bool loaded) { completion->set_value(loaded); });
++    while (result.wait_for(std::chrono::milliseconds(10)) != std::future_status::ready)
++    {
++      if (stop_token.stop_requested() || !Core::IsRunningOrStarting(system))
++      {
++        return RuntimeError{RuntimeErrorCode::InvalidState,
++                            "Save-state load interrupted by shutdown"};
++      }
++    }
++    if (!result.get())
++      return RuntimeError{RuntimeErrorCode::InvalidState, "Save state could not be loaded"};
++    break;
++  }
+   case automation::CommandType::Screenshot:
+     SaveAutomationScreenshot(NormalizeScreenshotPath(command.path));
+     break;

@@ -39,4 +39,6 @@ The launcher allows one visible game per user across package folders. Setup and 
 
 New Twin Snakes save states record the disc mounted at save time. Load a state with that disc mounted. For a local Disc 2 test, run `TwinSnakes.exe --boot-disc 2`. Older states lack disc metadata and require selecting the matching disc yourself. In-game memory-card saves still trigger the story’s automatic disc change.
 
+The runtime’s debug automation reports `load_state` as processed after the CPU completes the load. Wait for that result before measuring or sending dependent input. A rejected load appears in the failed command directory and `last_error`.
+
 Enable **Photo Album capture** under the launcher’s advanced video settings before taking pictures with the in-game Digital Camera. For standalone play, set `XFBToTextureEnable = False` under `[Hacks]` in the data folder’s `user/Config/GFX.ini` before starting the game. Take a new photo after enabling the setting.
