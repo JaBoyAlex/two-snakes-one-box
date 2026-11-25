@@ -7,4 +7,13 @@
 
 Exact dependency revisions are recorded in `dependencies.lock.json`. Bundled open-source runtime files must retain their license notices, and distributions must provide the corresponding source as required by those licenses. The runtime staging directory is private build output, not game content. Do not add generated game modules, extracted disc data or proprietary SDK/source files to a distribution.
 
+Windows runtime staging copies notices for the linked dependencies and Vulkan headers from the pinned RecompCore tree to `runtime/licenses/RecompCore/Externals`. It includes source-file notices for the Bochs disassembler, FreeSurround and Kiss FFT.
+
+The Windows package includes these tool distributions. Their download digests are recorded in `dependencies.lock.json`.
+
+- Python 3.13.16, with notices in `python/LICENSE.txt`. [Python release](https://www.python.org/downloads/release/python-31316/)
+- CMake 4.4.4, with notices in `tools/cmake/doc/cmake/LICENSE.rst`. [CMake release](https://github.com/Kitware/CMake/releases/tag/v4.4.4)
+- Ninja 1.13.2, with its Apache 2.0 license in `tools/ninja/COPYING`. [Ninja release](https://github.com/ninja-build/ninja/releases/tag/v1.13.2)
+- llvm-mingw 20260908, with notices in `tools/llvm-mingw/LICENSE.TXT` and its component directories. [llvm-mingw release](https://github.com/mstorsjo/llvm-mingw/releases/tag/20260908)
+
 Original code in this repository is licensed under GPL-3.0-or-later; dependency licenses remain with their respective authors.

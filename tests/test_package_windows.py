@@ -1,13 +1,38 @@
+import hashlib
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from zipfile import ZipFile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+from bootstrap import prepare_windows_tools
 from package_windows import check_package_tree
 
 
 class PackageWindowsTests(unittest.TestCase):
+    def test_prepares_pinned_archive_and_license_together(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / 'tool.zip'
+            with ZipFile(archive, 'w') as bundle:
+                bundle.writestr('ninja-test/ninja.exe', 'tool content')
+            license_file = root / 'license.txt'
+            license_file.write_bytes(b'upstream license')
+            copy = {'url': license_file.as_uri(), 'sha256': '0' * 64}
+            lock = {'ninja': {'url': archive.as_uri(),
+                              'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
+                              'root': 'ninja-test', 'copying': copy}}
+            target = root / 'tools'
+            with self.assertRaisesRegex(SystemExit, 'Download hash mismatch'):
+                prepare_windows_tools(target, lock)
+            self.assertFalse(target.exists())
+
+            copy['sha256'] = hashlib.sha256(license_file.read_bytes()).hexdigest()
+            prepare_windows_tools(target, lock)
+            self.assertEqual((target / 'ninja/ninja.exe').read_bytes(), b'tool content')
+            self.assertEqual((target / 'ninja/COPYING').read_bytes(), b'upstream license')
+
     def test_rejects_private_runtime_inputs(self):
         for relative in ('sdk/module-template/generated/translated.c', 'recompdata/prepared.json',
                          'game.GGSEA4_Recomp.DLL', 'latest.LOG', 'run.profraw'):

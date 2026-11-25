@@ -7,6 +7,47 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
+WINDOWS_EXTERNAL_NOTICES = (
+    'bzip2/bzip2/LICENSE',
+    'cpp-optparse/cpp-optparse/LICENSE',
+    'cubeb/cubeb/LICENSE',
+    'curl/curl/COPYING',
+    'enet/enet/LICENSE',
+    'FatFs/LICENSE.txt',
+    'fmt/fmt/LICENSE',
+    'glslang/glslang/LICENSE.txt',
+    'hidapi/hidapi-src/LICENSE.txt',
+    'hidapi/hidapi-src/LICENSE-bsd.txt',
+    'hidapi/hidapi-src/LICENSE-gpl3.txt',
+    'hidapi/hidapi-src/LICENSE-orig.txt',
+    'imgui/imgui/LICENSE.txt',
+    'implot/implot/LICENSE',
+    'liblzma/COPYING',
+    'libspng/libspng/LICENSE',
+    'libusb/libusb/COPYING',
+    'lz4/lz4/LICENSE',
+    'LZO/COPYING',
+    'mbedtls/LICENSE',
+    'minizip-ng/minizip-ng/LICENSE',
+    'pugixml/pugixml/LICENSE.md',
+    'SDL/SDL/LICENSE.txt',
+    'SFML/SFML/license.md',
+    'spirv_cross/SPIRV-Cross/LICENSE',
+    'tinygltf/tinygltf/LICENSE',
+    'Vulkan-Headers/LICENSE.md',
+    'Vulkan-Headers/LICENSES/Apache-2.0.txt',
+    'Vulkan-Headers/LICENSES/MIT.txt',
+    'VulkanMemoryAllocator/LICENSE.txt',
+    'xxhash/xxHash/LICENSE',
+    'zlib-ng/zlib-ng/LICENSE.md',
+    'zstd/zstd/COPYING',
+    'zstd/zstd/LICENSE',
+)
+WINDOWS_INLINE_NOTICES = (
+    'Bochs_disasm/dis_decode.cc',
+    'FreeSurround/source/FreeSurroundDecoder.cpp',
+    'FreeSurround/source/KissFFT.cpp',
+)
 
 
 def apply_patch(source, name, *, after=()):
@@ -18,6 +59,18 @@ def apply_patch(source, name, *, after=()):
         apply_patch(source, prerequisite)
     subprocess.run([*command, '--check', str(patch)], check=True)
     subprocess.run([*command, str(patch)], check=True)
+
+
+def stage_windows_external_notices(externals, output):
+    for name in WINDOWS_EXTERNAL_NOTICES:
+        notice = output / name
+        notice.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(externals / name, notice)
+    for name in WINDOWS_INLINE_NOTICES:
+        notice = output / Path(name).with_suffix('.copyright.txt')
+        notice.parent.mkdir(parents=True, exist_ok=True)
+        text = (externals / name).read_text(encoding='utf-8').split('#include', 1)[0]
+        notice.write_text(text.rstrip() + '\n', encoding='utf-8')
 
 
 def main():
@@ -110,6 +163,8 @@ def main():
         for license_path in directory.glob('LICENSE*'):
             if license_path.is_file():
                 shutil.copy2(license_path, licenses / f'{name}-{license_path.name}')
+    if os.name == 'nt':
+        stage_windows_external_notices(dolphin / 'Externals', licenses / 'RecompCore/Externals')
     shutil.copy2(ROOT / 'dependencies.lock.json', output / 'dependencies.lock.json')
     print(f'Runtime staged at {output}')
 

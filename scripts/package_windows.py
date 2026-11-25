@@ -54,7 +54,9 @@ def main():
     for required in [args.launcher, args.runtime / 'moderngekko-run.exe', args.runtime / 'dolrecomp.exe',
                      args.runtime / 'dolphin-tool.exe', args.tools / 'python/python.exe',
                      args.tools / 'cmake/bin/cmake.exe', args.tools / 'ninja/ninja.exe',
-                     args.tools / 'llvm-mingw/bin/clang.exe']:
+                     args.tools / 'llvm-mingw/bin/clang.exe', args.tools / 'python/LICENSE.txt',
+                     args.tools / 'cmake/doc/cmake/LICENSE.rst', args.tools / 'ninja/COPYING',
+                     args.tools / 'llvm-mingw/LICENSE.TXT']:
         if not required.is_file():
             raise SystemExit(f'Missing package input: {required}')
     check_package_tree(args.runtime, runtime=True)
