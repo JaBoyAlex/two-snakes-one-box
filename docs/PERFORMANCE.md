@@ -417,6 +417,10 @@ The updated benchmark waited for restoration to finish on the CPU thread. A trun
 
 These runs cover different scenes, so a matched replay is needed to compare the backends. The short dips at both checkpoints remain open.
 
+An instrumented runtime measured eight vertical blank gaps of at least 30 ms in a repeat of Tower A at 4× offscreen Direct3D 11. The longest was 38.44 ms. Windows sampled the shared CPU and video thread as running or ready throughout these gaps. The disc read, shader and Direct3D wait probes reported no events during those gaps.
+
+The 4× offscreen Vulkan Raven replay measured 118 vertical blank gaps of at least 30 ms. All 118 overlapped waits to reuse an upload buffer. The longest gap was 52.87 ms and included 37.74 ms in the buffer wait, almost all inside the Vulkan fence call. The renderer's offscreen path skips the regular windowed backbuffer submission. This makes GPU submission cadence a variable in offscreen comparisons. The user's visible window pauses require separate validation.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
