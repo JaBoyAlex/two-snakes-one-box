@@ -396,6 +396,13 @@ def play(args, runtime, data, log):
         command += ['--automation-dir', args.automation_dir.resolve()]
     env = os.environ.copy()
     env.pop('MODERNGEKKO_ALTERNATE_DISC', None)
+    env.pop('STATICRECOMP_PROFILE_FALLBACK_RANGES', None)
+    if (profile and metadata['dol_sha256'] == profile['dol_sha256']
+            and args.experimental_cache_loops and not args.allow_interpreter
+            and 'rel' not in record.get('identity', {})):
+        jit_ranges = profile.get('jit_cache_loop_ranges')
+        if jit_ranges:
+            env['STATICRECOMP_PROFILE_FALLBACK_RANGES'] = ','.join(jit_ranges)
     if len(discs) == 2:
         env['MODERNGEKKO_ALTERNATE_DISC'] = str(data / discs[2 - args.boot_disc]['dol'])
     # Distinct package folders have distinct data locks and can share this desktop.
@@ -416,6 +423,8 @@ def main():
     parser.add_argument('--prepare', action='store_true')
     parser.add_argument('--experimental-rel', action='store_true',
                         help='Compile the gameplay module along with the boot executable')
+    parser.add_argument('--experimental-cache-loops', action='store_true',
+                        help='Test JIT routing for the verified boot module cache loops when playing')
     parser.add_argument('--inspect', action='store_true')
     parser.add_argument('--disc1', type=Path)
     parser.add_argument('--disc2', type=Path)

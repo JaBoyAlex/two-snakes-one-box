@@ -481,6 +481,34 @@ Two further 20-second Direct3D 11 runs seeded from the regenerated dev.28 cache 
 
 An MSVC map build replayed the same Tower A checkpoint headlessly for 25 seconds in both JIT and hybrid modes. Both held 100% median game speed. A 12-second instruction-pointer capture began seven seconds after the checkpoint loaded. Of 765 snapshots in the hybrid run, 184 landed in the native game module. The runner's instruction fallback hook accounted for 64, the native run loop for 53, and register synchronization for 28. The same sampler captured 375 snapshots in `ntdll.dll` out of 764 in the JIT run. The counts include waits and pauses from sampling and locate CPU paths for follow-up.
 
+### Fixed cache-loop routing
+
+Two heavily used boot-code routines handle GameCube cache maintenance. The regular hybrid path previously entered the native dispatcher and instruction fallback hook repeatedly during these loops. A private runtime trial let x64 JIT blocks link within two fixed fallback routines. Linked exits still return to the runtime dispatcher for destinations that can execute native code.
+
+| Checkpoint | Matched frames | Reference → candidate, reference first | Reference → candidate, candidate first |
+| --- | ---: | ---: | ---: |
+| Disc 2 Tower A | 1,668 | 15.751 → 12.937 ms/frame | 15.506 → 12.829 ms/frame |
+| Disc 1 Heliport | 1,501 | 11.805 → 12.176 ms/frame | 11.837 → 12.201 ms/frame |
+
+All eight headless replays held 100% median game speed and shut down normally. Tower A's CPU cost per frame fell by 17.3–17.9%. Its reference sessions logged about 357 million instruction fallback hook calls each. The candidate logged about 0.52 million each and continued to dispatch native code. Heliport cost rose by about 3.1%, with every speed sample at 100%.
+
+The integrated runtime produced 28.744 seconds of DSP audio identical to dev.28 in Tower A and 28.729 seconds in the Hind fight. Both disc-audio tracks were silent throughout the captures. A packaged test reused a prepared dev.28 install and restored the Tower A checkpoint. It logged 475,945 instruction fallback hook calls with the range profile and 103,101,473 with the diagnostic override disabling the ranges. Both runs advanced at least 600 post-load present callbacks with native dispatch and shut down normally.
+
+The dev.29 candidate also completed two 81-second windowed 4× replays with Cubeb. Windows process loopback captured 75.000 seconds of audio per run. All 7,500 packets per capture contained signal and reported zero discontinuities or timestamp gaps over 2 ms.
+
+| Checkpoint | Backend | Median / lowest game speed | Samples below 95% | Longest vertical blank interval |
+| --- | --- | ---: | ---: | ---: |
+| Disc 2 Vulcan Raven | Vulkan | 100% / 99.4% | 0 / 324 | 20.93 ms |
+| Disc 1 Underground Passage flashback | Direct3D 11 | 100% / 88.3% | 31 / 324 | 44.07 ms |
+
+Thirty of the 31 flashback speed dips fell in the same ten-second portion of the replay. The flashback includes a sequence at roughly 30 rendered frames per second and later gameplay. Game-speed and vertical-blank measurements show the host pacing separately from how often the scene produces a different frame.
+
+Four further 81-second Direct3D 11 replays at 4× compared dev.28 with the dev.29 range profile in both run orders. Dev.28 had 3 and 7 samples below 95% speed. The range profile had 18 and 30. All four held 100% median game speed, and all speed dips occurred in the same portion of the restored scene. The range profile is opt-in through `--experimental-cache-loops` while the flashback regression is investigated.
+
+### Modern x64 compiler target
+
+Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.

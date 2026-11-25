@@ -185,6 +185,33 @@ class PrepareTests(unittest.TestCase):
             self.assertIn(f'progress 0.040 Checking {filename}', stdout.buffer.getvalue().decode('utf-8'))
             self.assertIn(f'Error: Cannot read {filename}', stderr.buffer.getvalue().decode('utf-8'))
 
+    def test_play_uses_profile_ranges_only_for_the_opted_in_verified_boot_module(self):
+        self.write_extraction(self.root / 'disc1')
+        (self.root / 'disc1.dll').write_bytes(b'linked output')
+        (self.root / 'link.complete').touch()
+        entry = {'root': 'disc1', 'dol': 'disc1/sys/main.dol', 'module': 'disc1.dll',
+                 'metadata': {'game_id': 'GGSEA4', 'revision': 0, 'dol_sha256': self.disc.dol_sha256}}
+        key = 'STATICRECOMP_PROFILE_FALLBACK_RANGES'
+        for identity, verified_hash, interpreter, opt_in, expected in (
+            ({}, self.disc.dol_sha256, False, True, '80000000-80000008'),
+            ({}, self.disc.dol_sha256, False, False, None),
+            ({'rel': {}}, self.disc.dol_sha256, False, True, None),
+            ({}, 'different', False, True, None),
+            ({}, self.disc.dol_sha256, True, True, None),
+        ):
+            with self.subTest(identity=identity, checksum=verified_hash, interpreter=interpreter, opt_in=opt_in):
+                twin_snakes.atomic_json(self.root / 'prepared.json',
+                                        {'identity': identity, 'discs': [entry]})
+                profile = {'dol_sha256': verified_hash, 'rel': None,
+                           'jit_cache_loop_ranges': ['80000000-80000008']}
+                args = SimpleNamespace(boot_disc=1, allow_interpreter=interpreter,
+                                       experimental_cache_loops=opt_in, headless=True, automation_dir=None)
+                with (patch.dict('os.environ', {key: 'stale'}),
+                      patch.object(twin_snakes, 'supported_profile', return_value=profile),
+                      patch.object(twin_snakes, 'run') as run):
+                    twin_snakes.play(args, self.root, self.root, None)
+                self.assertEqual(run.call_args.kwargs['env'].get(key), expected)
+
     def test_visible_play_rejects_a_second_install_and_releases_the_lock(self):
         first = self.root / 'first'
         second = self.root / 'second'

@@ -1,0 +1,41 @@
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
+@@ -139,15 +139,17 @@
+ bool StaticRecompCore::AllowsFallbackBlockLinking() const
+ {
+   return m_module && !m_has_rel_modules && !m_guest.host_call &&
+-         !m_module_source.host_call_contains && m_forced_fallback_ranges.empty();
++         !m_module_source.host_call_contains;
+ }
+ 
+ bool StaticRecompCore::CanLinkFallbackTo(u32 address) const
+ {
+   // A linked exit bypasses the core's dispatcher. Keep that boundary for
+   // every destination the native module could cover after verification.
++  // Explicit fallback ranges are fixed at initialization and stay on the JIT.
+   return AllowsFallbackBlockLinking() &&
+-         !AddressIsCovered(m_module->code_ranges, m_module->num_code_ranges, address);
++         (IsForcedFallbackAddress(address) ||
++          !AddressIsCovered(m_module->code_ranges, m_module->num_code_ranges, address));
+ }
+ 
+ StaticRecompCore::StaticRecompCore(Core::System& system, StaticRecompModuleSource module_source)
+@@ -163,8 +165,15 @@
+   RefreshConfig();
+   m_collect_dispatch_samples = std::getenv("STATICRECOMP_DISPATCH_SAMPLES") != nullptr;
+   const char* fallback_override = std::getenv("STATICRECOMP_FALLBACK_RANGES");
+-  std::istringstream fallback_ranges(fallback_override ? fallback_override :
+-                                                         Config::Get(Config::MAIN_STATICRECOMP_FALLBACK_RANGES));
++  std::string configured_ranges = Config::Get(Config::MAIN_STATICRECOMP_FALLBACK_RANGES);
++  if (fallback_override)
++    configured_ranges = fallback_override;
++  else if (configured_ranges.empty())
++  {
++    if (const char* profile_ranges = std::getenv("STATICRECOMP_PROFILE_FALLBACK_RANGES"))
++      configured_ranges = profile_ranges;
++  }
++  std::istringstream fallback_ranges(configured_ranges);
+   std::string fallback_range;
+   while (std::getline(fallback_ranges, fallback_range, ','))
+   {

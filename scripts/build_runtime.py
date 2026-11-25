@@ -105,7 +105,8 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-win32-fullscreen.patch',
                 after=('recompcore-win32-window-teardown.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-fastmem.patch')
-    apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-linking.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-fixed-range-linking.patch',
+                after=('recompcore-fallback-linking.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-trim-native-chunk-lookup.patch',
                 after=('recompcore-verified-virtual-code.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-cache-dispatch.patch')

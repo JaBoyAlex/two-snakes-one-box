@@ -19,6 +19,8 @@ Setup verifies the extracted boot executable before reusing a disc directory. Ru
 
 Play verifies both prepared boot executables and checks the native module against its recorded digest. When a check fails, the launcher keeps the previous setup record as `prepared.needs-repair.json`. In RecompLauncher, close the error and press Play again to reopen Easy Setup. Standalone players can reopen `TwinSnakes.exe` to select the disc images again.
 
+Run `TwinSnakes.exe --experimental-cache-loops` to test JIT routing for two cache-maintenance routines in the verified USA boot profile. The diagnostic `STATICRECOMP_FALLBACK_RANGES` environment variable takes precedence, followed by a nonempty `StaticRecompFallbackRanges` runtime setting.
+
 To build the experimental native gameplay module, add `--experimental-rel` to `--prepare` after rebuilding the source runtime. Give the experiment its own `--data` directory. The builder links the verified REL from the selected discs and selects the new build after both discs are prepared. The regular launcher install uses the boot-only module while gameplay and timing tests are pending.
 
 `scripts/bootstrap.py` fetches the pinned upstream source trees. `scripts/build_runtime.py` compiles the recompiler, runner and disc conversion tool, then stages the runtime and the source needed to compile game modules. No retail game files are needed to build the tools.
