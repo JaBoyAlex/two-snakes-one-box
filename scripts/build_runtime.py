@@ -60,6 +60,7 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-disc-fst-capacity.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-savestate-disc-check.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-savestate-load-result.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-windows-fst-rename-retry.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-twin-snakes-idle.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-llvm-region-check.patch')
     apply_patch(source / 'vendor/dolphin/DolRecomp', 'dolrecomp-win64-llvm-returns.patch')

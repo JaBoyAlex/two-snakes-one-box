@@ -1,0 +1,55 @@
+diff --git a/Source/Core/Core/IOS/FS/HostBackend/FS.cpp b/Source/Core/Core/IOS/FS/HostBackend/FS.cpp
+--- a/Source/Core/Core/IOS/FS/HostBackend/FS.cpp
++++ b/Source/Core/Core/IOS/FS/HostBackend/FS.cpp
+@@ -10,6 +10,14 @@
+ #include <type_traits>
+ #include <unordered_map>
+ #include <utility>
++
++#ifdef _WIN32
++#include <chrono>
++#include <filesystem>
++#include <system_error>
++#include <thread>
++#include <winerror.h>
++#endif
+ 
+ #include <fmt/format.h>
+ 
+@@ -227,8 +235,34 @@
+       return;
+     }
+   }
+-  if (!File::Rename(temp_path, dest_path))
+-    PanicAlertFmt("IOS_FS: Failed to rename temporary FST file");
++#ifdef _WIN32
++  const auto source = StringToPath(temp_path);
++  const auto destination = StringToPath(dest_path);
++  std::error_code error;
++  std::filesystem::rename(source, destination, error);
++
++  // A reader that denies delete sharing can briefly block this atomic replacement.
++  // Windows can report access denied when the destination file is held open.
++  using namespace std::chrono_literals;
++  for (const auto delay : {10ms, 20ms, 40ms})
++  {
++    if (error.category() != std::system_category() ||
++        (error.value() != ERROR_SHARING_VIOLATION && error.value() != ERROR_ACCESS_DENIED))
++    {
++      break;
++    }
++    std::this_thread::sleep_for(delay);
++    std::filesystem::rename(source, destination, error);
++  }
++  if (!error)
++    return;
++
++  ERROR_LOG_FMT(IOS_FS, "Failed to replace {}: {}", dest_path, error.message());
++#else
++  if (File::Rename(temp_path, dest_path))
++    return;
++#endif
++  PanicAlertFmt("IOS_FS: Failed to rename temporary FST file");
+ }
+ 
+ HostFileSystem::FstEntry* HostFileSystem::GetFstEntryForPath(const std::string& path)
