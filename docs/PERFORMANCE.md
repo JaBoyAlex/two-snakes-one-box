@@ -46,7 +46,7 @@ Use `--compare-threading` to run shared and separate CPU/video threads in both o
 
 Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay. Benchmark profiles and logs default to a subdirectory of the system temporary directory. Use `--output PATH` to retain traces elsewhere. One run in a synced workspace failed to replace the test profile's filesystem metadata (`IOS_FS: Failed to rename temporary FST file`). Repeat runs with isolated profiles outside the synced workspace completed successfully.
 
-The benchmark requires both advancing present callbacks and newly drawn frames to report speed and frame-rate statistics. A stalled restore retains its raw status samples. If the renderer keeps presenting the same frame, it reports `presentation_advanced: true` and `drawn_frames_advanced: false` and fails the replay.
+The benchmark requires both advancing present callbacks and newly drawn frames to report speed and frame-rate statistics. A stalled restore retains its raw status samples. If the renderer keeps presenting the same frame, it reports `presentation_advanced: true` and `drawn_frames_advanced: false` and fails the replay. The summary also reports the longest observed pause and the pause at the end of the window for each counter. Check these when a replay advanced before it froze. The status poll runs about four times per second, so use the interval logs for shorter hitches.
 
 For an order-reversed graphics comparison, pair `--windowed Vulkan` with `--compare-backend D3D`. Use `--offscreen Vulkan` for a headless rendering comparison with audio output disabled. Each leg starts from its own profile. To compare warm runs, pass a `--shader-cache-seed` containing cache files for both backends.
 
@@ -580,6 +580,28 @@ The dev.35 packaged runner restored those checkpoints for 33 seconds each in win
 | Tank | 19.55 ms | 19.68 ms |
 | Ninja | 20.73 ms | 20.14 ms |
 | Sniper Wolf | 20.20 ms | 19.46 ms |
+
+### Dev.35 sustained Tower A and flashback
+
+Three isolated dev.35 replays sampled 90 seconds at 4× with a seeded shader cache, shared threads and Cubeb. Windows process loopback captured about 84 seconds of audible output from each run with zero reported packet discontinuities or valid timestamp gaps above 2 ms.
+
+| Checkpoint and renderer | Median / minimum game speed | Samples below 95% | Longest render interval | Longest vertical blank |
+| --- | ---: | ---: | ---: | ---: |
+| Tower A, Direct3D 11 | 100% / 88.9% | 4 / 359 | 494.38 ms | 25.92 ms |
+| Tower A, Vulkan | 100% / 83.8% | 7 / 360 | 492.00 ms | 103.14 ms |
+| Underground Passage flashback, Direct3D 11 | 100% / 96.0% | 0 / 359 | 333.77 ms | 53.70 ms |
+
+The long Direct3D 11 Tower A render interval occurred about 80 seconds after boot while the sampled game speed stayed at 100%. Its four speed dips came earlier. A traced Direct3D 11 repeat recorded 29 successive video fields that reused the previous framebuffer. The next newly drawn frame arrived 500.5 ms later in guest time and 492.2 ms later in host time. The trace recorded no focus change or resize during that gap.
+
+### Windows focus changes
+
+A separate trace recorded a 168.6 ms render gap near a focus change while only one guest video field elapsed. Windowed and 2560 × 1440 borderless Alt-Tab checks retained their respective client-area sizes. A 62-second windowed capture included focus changes and recorded 56 seconds of audible Cubeb output with zero Windows loopback discontinuities.
+
+The Windows focus-loss handler used to set the speed to 100% even when that speed was already active. The first write can create a current-run setting and invoke configuration callbacks. The candidate skips the write at normal speed and still restores normal speed if the fast-forward key is released in another window.
+
+Two traced 52-second Tower A replays at 4× Direct3D 11 used the same warm-cache seed. Each switched focus between the game and Calculator. The control recorded a 154.3 ms render gap shortly after losing focus. The candidate's maximum render interval across its replay was 38.9 ms. The control recorded 13 of 209 samples below 95% game speed, and the candidate recorded zero of 209. Both reached 100% median speed and recorded zero packet discontinuities over 46 seconds of Windows loopback each. These measurements cover one machine and one checkpoint.
+
+The packaged dev.36 runner repeated the check over 46 seconds. After switching away and back, including with Alt-Tab, the longest render interval was 38.3 ms. The replay held 100% median game speed with zero of 185 samples below 95% and zero packet discontinuities in 40 seconds of audible Windows loopback.
 
 ### Modern x64 compiler target
 

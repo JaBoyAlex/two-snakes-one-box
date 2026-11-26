@@ -1,0 +1,16 @@
+diff --git a/Source/Core/DolphinNoGUI/PlatformWin32.cpp b/Source/Core/DolphinNoGUI/PlatformWin32.cpp
+--- a/Source/Core/DolphinNoGUI/PlatformWin32.cpp
++++ b/Source/Core/DolphinNoGUI/PlatformWin32.cpp
+@@ -484,9 +484,9 @@
+     break;
+ 
+   case WM_KILLFOCUS:
+-    // Never leave emulation running fast because Space was released while
+-    // another window had focus and the key-up went elsewhere.
+-    Config::SetCurrent(Config::MAIN_EMULATION_SPEED, 1.0f);
++    // Restore normal speed if Space was released while another window had focus.
++    if (Config::Get(Config::MAIN_EMULATION_SPEED) != 1.0f)
++      Config::SetCurrent(Config::MAIN_EMULATION_SPEED, 1.0f);
+     break;
+ 
+   case WM_SYSKEYDOWN:

@@ -11,6 +11,37 @@ import benchmark_boot
 
 
 class BenchmarkTests(unittest.TestCase):
+    def test_reports_ending_draw_pause_while_duplicate_presents_continue(self):
+        with TemporaryDirectory() as directory:
+            work = Path(directory)
+            elapsed = 0.0
+
+            def poll_status(interval):
+                nonlocal elapsed
+                elapsed += interval
+                # Draw once after sampling begins, pause and recover, then freeze.
+                frame = 3 if elapsed >= 4.25 else 2 if elapsed >= 3.5 else 1
+                (work / 'control/status.txt').write_text(
+                    f'booted=1\nstate=running\nspeed=1\nvps=60\nfps=30\n'
+                    f'frame_count={frame}\npresent_count={int(elapsed * 60)}\n')
+
+            with (patch.object(benchmark_boot.subprocess, 'Popen') as launch,
+                  patch.object(benchmark_boot.time, 'monotonic', side_effect=lambda: elapsed),
+                  patch.object(benchmark_boot.time, 'sleep', side_effect=poll_status),
+                  patch('builtins.print')):
+                process = launch.return_value
+                process.poll.return_value = None
+                process.returncode = 0
+                benchmark_boot.benchmark('jit', 'runner', 'disc', 'module',
+                                         work, True, 'D3D', 2, None, False)
+
+            summary = json.loads((work / 'summary.json').read_text())
+            self.assertTrue(summary['drawn_frames_advanced'])
+            self.assertEqual(summary['counter_pauses'], {
+                'drawn_frames': {'longest_seconds': 1.0, 'ending_seconds': 1.0},
+                'presents': {'longest_seconds': 0.0, 'ending_seconds': 0.0},
+            })
+
     def test_distinguishes_new_frames_from_duplicate_presents(self):
         for advancing in (False, True):
             with self.subTest(advancing=advancing), TemporaryDirectory() as directory:

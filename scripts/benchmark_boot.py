@@ -52,6 +52,20 @@ def summarize_speed(speeds):
             'samples_below_95_percent': sum(speed < 0.95 for speed in ordered)}
 
 
+def summarize_counter_pauses(samples, counter):
+    if not samples:
+        return {}
+    last_change = samples[0]
+    longest = 0
+    tail = 0
+    for sample in samples[1:]:
+        if sample[counter] != last_change[counter]:
+            last_change = sample
+        tail = sample['seconds_since_boot'] - last_change['seconds_since_boot']
+        longest = max(longest, tail)
+    return {'longest_seconds': round(longest, 2), 'ending_seconds': round(tail, 2)}
+
+
 def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load_state, dispatch_samples,
               *, dual_core=None, frame_times=False, internal_scale=1, fullscreen=False,
               alternate_disc=None, shader_cache_seed=None):
@@ -175,6 +189,11 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                'startup_seconds': round(booted_at - start, 2) if booted_at is not None else None,
                'sample_count': len(samples), 'samples': samples,
                'internal_scale_requested': internal_scale, 'fullscreen_requested': fullscreen}
+    if samples:
+        summary['counter_pauses'] = {
+            'drawn_frames': summarize_counter_pauses(samples, 'frame_count'),
+            'presents': summarize_counter_pauses(samples, 'present_count'),
+        }
     if load_state:
         summary['checkpoint_ready_seconds'] = round(began_sampling - start, 2) if began_sampling is not None else None
         if began_sampling is None:

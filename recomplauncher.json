@@ -205,11 +205,11 @@
     },
     {
       "id": "photo_capture",
-      "label": "Photo Album capture",
+      "label": "Codec and Photo Album accuracy",
       "group": "Video",
       "in": "graphics",
       "advanced": true,
-      "help": "Enable this before taking in-game photos to save the picture correctly.",
+      "help": "Enable this to restore the Codec backdrop and capture pictures correctly. Restart the game after changing it.",
       "defaults": {
         "Hacks/XFBToTextureEnable": "True"
       },

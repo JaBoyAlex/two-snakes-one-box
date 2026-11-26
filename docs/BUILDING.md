@@ -55,4 +55,4 @@ New Twin Snakes save states record the disc mounted at save time. Load a state w
 
 The runtime’s debug automation reports `load_state` as processed after the CPU completes the load. Wait for that result before measuring or sending dependent input. A rejected load appears in the failed command directory and `last_error`.
 
-Enable **Photo Album capture** under the launcher’s advanced video settings before taking pictures with the in-game Digital Camera. For standalone play, set `XFBToTextureEnable = False` under `[Hacks]` in the data folder’s `user/Config/GFX.ini` before starting the game. Take a new photo after enabling the setting.
+Enable **Codec and Photo Album accuracy** under the launcher's advanced video settings to fix the solid blue radio backdrop and capture photos correctly. In dev.35 and earlier, the option is called **Photo Album capture**. Restart after changing it. For standalone play, set `XFBToTextureEnable = False` under `[Hacks]` in the data folder’s `user/Config/GFX.ini` before starting the game. Take a new photo after enabling the setting.
