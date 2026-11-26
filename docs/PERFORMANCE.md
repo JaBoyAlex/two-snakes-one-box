@@ -557,6 +557,18 @@ Four 20-second Heliport comparisons on Direct3D 11 and four 20-second Raven comp
 
 In a longer 54-second flashback replay, the candidate held 100% median speed and recorded four of 217 samples below 95%, with a 94.1% floor. Windows process loopback captured 48 seconds of audible Cubeb output, with zero reported packet discontinuities or valid timestamp gaps above 2 ms.
 
+### Dev.33 late Disc 2 replays
+
+Three isolated dev.33 launches each loaded a USA Very Easy practice save through the in-game card menu. The REX and Liquid fights and the Escape Route all responded to analog input and advanced 441–442 rendered frames after the input sequence began. The Escape Route replay crossed a doorway. All three retained Disc 2, preserved their card save byte for byte and shut down normally. [Practice-save source](https://www.speedrun.com/mgstts/resources)
+
+The packaged runner restored a checkpoint from each launch and sampled 33 seconds at 4× with shared threads and Cubeb. All three held 100% median game speed, with zero of 399 samples below 95%. Windows process loopback recorded 27 seconds of audible audio per scene with zero packet discontinuities or valid timestamp gaps above 2 ms.
+
+| Starting checkpoint | Renderer | Newly drawn frames per second | Longest vertical blank |
+| --- | --- | ---: | ---: |
+| REX | Direct3D 11 | 58.68 | 18.79 ms |
+| Liquid | Vulkan | 59.85 | 17.18 ms |
+| Escape Route | Direct3D 11 | 59.83 | 17.28 ms |
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.
