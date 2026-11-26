@@ -58,6 +58,7 @@ PATCH_PREREQUISITES = {
     'recompcore-fixed-range-linking.patch': ('recompcore-fallback-linking.patch',),
     'recompcore-fixed-dispatch-bounds.patch': ('recompcore-fixed-range-linking.patch',),
     'recompcore-trim-native-chunk-lookup.patch': ('recompcore-verified-virtual-code.patch',),
+    'recompcore-fixed-fallback-lookup.patch': ('recompcore-trim-native-chunk-lookup.patch',),
     'recompcore-cache-bat-translation.patch': ('recompcore-cache-instruction-hook.patch',),
 }
 
@@ -117,7 +118,7 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-win32-focus-speed.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-fastmem.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fixed-dispatch-bounds.patch')
-    apply_patch(source / 'vendor/dolphin', 'recompcore-trim-native-chunk-lookup.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-fixed-fallback-lookup.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-cache-dispatch.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-cache-bat-translation.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-register-sync.patch')

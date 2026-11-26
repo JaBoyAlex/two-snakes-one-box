@@ -1,0 +1,83 @@
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
+@@ -210,6 +210,7 @@
+   // Lookup table optimization for O(1) chunk searches
+   static constexpr u32 FAKE_VMEM_BASE = 0x7E000000u;
+   std::vector<int> m_chunk_lookup_table;
++  bool m_fallback_ranges_in_lookup = false;
+   u32 m_lookup_ram_size = 0;
+   u32 m_lookup_exram_size = 0;
+   u32 m_lookup_fake_vmem_size = 0;
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Run.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Run.cpp
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Run.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_Run.cpp
+@@ -65,7 +65,7 @@
+   InitLookupTable(m_guest.ram_size, m_guest.exram_size);
+   const bool lockstep_enabled = m_lockstep_verifier->IsEnabled();
+   const auto fast_dispatchable_at = [this](u32 address) {
+-    if (m_has_rel_modules || !m_forced_fallback_ranges.empty())
++    if (m_has_rel_modules || !m_fallback_ranges_in_lookup)
+       return FastDispatchableAt(address);
+     if (!m_module_active || m_chunk_lookup_table.empty())
+       return false;
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore_SMC.cpp
+@@ -185,6 +185,18 @@
+     return;
+   }
+ 
++  // In a fixed module, whole instruction words can be excluded directly from the lookup.
++  // Relocated addresses and byte-granular overrides still need the dynamic range check.
++  const auto unaligned = [](const StaticRecompRange& range) {
++    return ((range.start | range.end) & 3u) != 0;
++  };
++  const auto* chunks = m_module->chunk_ranges;
++  m_fallback_ranges_in_lookup =
++      !m_has_rel_modules &&
++      (m_forced_fallback_ranges.empty() ||
++       (std::ranges::none_of(m_forced_fallback_ranges, unaligned) &&
++        std::none_of(chunks, chunks + m_module->num_chunk_ranges, unaligned)));
++
+   // Addresses above the last mapped chunk already miss the bounds checks in the lookup.
+   int last_mapped_index = -1;
+   for (u32 i = 0; i < m_module->num_chunk_ranges; ++i)
+@@ -202,7 +214,18 @@
+     const int length = static_cast<int>((chunk.end - chunk.start) >> 2);
+     if (start_idx >= 0 && last_idx >= 0 && last_idx - start_idx + 1 == length)
+     {
+-      std::fill_n(m_chunk_lookup_table.begin() + start_idx, length, static_cast<int>(i));
++      const auto first = m_chunk_lookup_table.begin() + start_idx;
++      std::fill_n(first, length, static_cast<int>(i));
++      if (m_fallback_ranges_in_lookup)
++      {
++        for (const auto& fallback : m_forced_fallback_ranges)
++        {
++          const u32 start = std::max(chunk.start, fallback.start);
++          const u32 end = std::min(chunk.end, fallback.end);
++          if (start < end)
++            std::fill_n(first + ((start - chunk.start) >> 2), (end - start) >> 2, -1);
++        }
++      }
+     }
+   }
+ }
+@@ -224,7 +247,7 @@
+ 
+ bool StaticRecompCore::FastDispatchableAt(u32 address)
+ {
+-  if (IsForcedFallbackAddress(address))
++  if (!m_fallback_ranges_in_lookup && IsForcedFallbackAddress(address))
+     return false;
+   const int index = ChunkIndexOf(address);
+   return index >= 0 && m_chunk_state[index] == CHUNK_VERIFIED;
+@@ -232,7 +255,7 @@
+ 
+ bool StaticRecompCore::DispatchableAt(u32 address)
+ {
+-  if (IsForcedFallbackAddress(address))
++  if (!m_fallback_ranges_in_lookup && IsForcedFallbackAddress(address))
+     return false;
+   const int index = ChunkIndexOf(address);
+   if (index < 0)

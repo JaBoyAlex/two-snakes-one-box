@@ -665,6 +665,20 @@ The dev.40 diagnostic runner samples the emulated clock at video-field boundarie
 
 The packaged runner restored the same checkpoint in both CPU modes for 14-second offscreen Vulkan replays. The flashback shared 14.064 seconds of guest time across the two runs and rendered about 39 new frames per second. The Dock shared 14.047 seconds and rendered about 60. All four held 100% median game speed. The Dock hybrid run had two of 57 samples below 95%, while the other three runs had zero. The clock lets us compare the same part of a scene even when the two runners draw different numbers of frames.
 
+### Precomputed fallback dispatch
+
+Fixed-address modules precompute their aligned fallback ranges in the native dispatch table. A dispatch to one of those addresses takes the existing fallback path. Relocated modules and unaligned ranges keep the dynamic check. Code invalidation still uses the original chunk ranges.
+
+Two 57-second flashback replays per runner used shared threads, accurate framebuffer copies and 4× Direct3D 11. The candidate enabled the vector route. Each runner went first once. Samples below 95% speed fell from 87 of 457 to 35 of 458. Over the same late ten seconds of guest time, the shared game and graphics thread used 1,004 ms of CPU time per guest second in both controls and 861–938 ms in the candidate runs. These measurements include the CPU side of rendering.
+
+Two more 64-second replays per runner used Tower A at 4× Vulkan. All four held 100% median game speed. Dev.40 had six of 514 samples below 95% and the candidate had zero of 513. Over 63.964 seconds of matched guest time, the candidate used about 3% less CPU time per guest second in both comparisons. The eight captures reported zero Windows audio packet discontinuities. The vector route remains opt-in while broader gameplay validation continues.
+
+The candidate and dev.40 generated sample-identical DSP audio over 55.836 seconds in the flashback and 55.830 seconds in Tower A. The regular source build reproduced the candidate's machine code and data sections apart from the Windows debug timestamp.
+
+Eight more 24-second replays covered Heliport at 4× Direct3D 11 and the Raven fight at 4× Vulkan, with each runner going first once per scene. All held 100% median game speed. None of the 776 samples fell below 95%. Each Windows loopback capture collected 18 seconds of audible output with zero reported packet discontinuities.
+
+A separate trace sampled native execution bursts on entry and grouped the vector routines by guest return address. In the late flashback window, 1,540 of 1,623 sampled vector bursts came from three call sites in the gameplay module. The same sites accounted for 184 of 385 sampled vector bursts in Tower A. This identifies where to measure a narrower route if other gameplay replays expose regressions.
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.

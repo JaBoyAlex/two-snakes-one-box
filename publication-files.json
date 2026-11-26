@@ -49,6 +49,7 @@
   "patches/recompcore-fallback-fastmem.patch",
   "patches/recompcore-fallback-linking.patch",
   "patches/recompcore-fixed-dispatch-bounds.patch",
+  "patches/recompcore-fixed-fallback-lookup.patch",
   "patches/recompcore-fixed-range-linking.patch",
   "patches/recompcore-gamepad-bindings.patch",
   "patches/recompcore-headless-shader-progress.patch",
