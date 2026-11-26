@@ -683,6 +683,18 @@ A follow-up used the same packaged dev.41 executable for both vector settings. I
 
 The same executable ran two 64-second Tower A replays at 4× Vulkan. The regular profile recorded two of 257 samples below 95% with a 94.9% floor. The vector profile recorded three of 257 with an 89.6% floor. Both reached 100% median speed and reported zero Windows audio packet discontinuities. The deeper dip in this repeat supports leaving the vector route opt-in.
 
+### Caller-specific vector routing
+
+A private runner kept the PowerPC JIT active through the three sampled vector calls when the guest program counter and return address both matched. The same executable ran one replay per profile with 4× internal resolution, warm shaders, shared threads and accurate framebuffer copies. The flashback ran for 56 seconds on Direct3D 11 and Tower A ran for 58 seconds on Vulkan. CPU time was aligned by the guest clock.
+
+| Profile | Flashback samples below 95% speed | Late flashback CPU ms per guest second | Tower A samples below 95% speed | Tower A CPU ms per guest second |
+| --- | ---: | ---: | ---: | ---: |
+| Regular | 93 / 224 | 1,049.0 | 0 / 233 | 921.1 |
+| Full vector route | 20 / 225 | 925.2 | 0 / 233 | 901.8 |
+| Three call sites | 24 / 225 | 942.7 | 0 / 233 | 920.3 |
+
+Both vector profiles brought the flashback to 100% median speed. All three Tower A runs held 100% median speed. Windows loopback reported zero audio packet discontinuities in all six runs. Restricting the JIT route to the three call sites added dispatch logic and used more CPU than the full vector route in both scenes. The existing experimental profile remains the option for broader gameplay validation.
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.
