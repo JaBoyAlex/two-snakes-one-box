@@ -543,6 +543,20 @@ An order-reversed trial kept those three vector routines in the JIT, with the re
 
 The headless flashback repeats produced about 34–60 new frames per second with the Null renderer while both builds held 100% median game speed. The runs reached different portions of the rendered workload at the same frame count, so the comparison used the windowed results for pacing. The regular module retains native execution for the vector routines.
 
+An instrumented Direct3D 11 replay at 4× logged guest framebuffer timestamps and host receipt times for each video field. In JIT-only mode, all 13 host intervals of at least 80 ms between new framebuffers corresponded to five guest fields, or 83.42 ms. In hybrid mode, 10 of 11 corresponded to five fields, and one corresponded to four fields (66.73 ms) with additional host delay. Original framebuffer cadence accounts for most of the long gaps. The separate vertical blank and game-speed metrics continue to measure host pacing.
+
+### Fallback JIT dispatch
+
+The fixed-module x64 dispatcher can skip the C++ native-code callback for guest addresses outside the validated code bounds. Addresses within the bounds still check module coverage and verification. Modules with relocated code or host-call hooks use the existing dispatcher path. The range is derived from the loaded module and does not depend on game addresses embedded in the runtime.
+
+Four order-reversed 49-second Direct3D 11 flashback replays at 4× held 100% median game speed. The reference recorded 13 of 393 samples below 95% with a 90.7% speed floor. The candidate recorded zero of 391 with a 97.1% floor. Both runners still recorded maximum gaps between newly rendered frames of about 84 ms.
+
+The four 23-second Tower A comparisons used the same settings and held 100% median speed with zero of 372 samples below 95%. The longest vertical blank was 23.93 ms across the reference runs and 25.81 ms across the candidate runs.
+
+Four 20-second Heliport comparisons on Direct3D 11 and four 20-second Raven comparisons on Vulkan also held 100% median speed. The eight runs had zero of 648 samples below 95%, with all vertical blank intervals shorter than 20 ms.
+
+In a longer 54-second flashback replay, the candidate held 100% median speed and recorded four of 217 samples below 95%, with a 94.1% floor. Windows process loopback captured 48 seconds of audible Cubeb output, with zero reported packet discontinuities or valid timestamp gaps above 2 ms.
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.

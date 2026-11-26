@@ -1,0 +1,63 @@
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.h
+@@ -56,6 +56,7 @@
+   bool IsHostCallAddress(u32 address) const;
+   bool ShouldYieldAt(u32 address);
+   bool AllowsFallbackBlockLinking() const;
++  StaticRecompRange GetFixedNativeCodeBounds() const;
+   bool CanLinkFallbackTo(u32 address) const;
+ 
+   void ClearCache() override;
+diff --git a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
+--- a/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
++++ b/Source/Core/Core/PowerPC/StaticRecomp/StaticRecompCore.cpp
+@@ -140,6 +140,17 @@
+ {
+   return m_module && !m_has_rel_modules && !m_guest.host_call &&
+          !m_module_source.host_call_contains;
++}
++
++StaticRecompRange StaticRecompCore::GetFixedNativeCodeBounds() const
++{
++  if (!AllowsFallbackBlockLinking())
++    return {};
++  const StaticRecompRange bounds{m_module->code_ranges[0].start,
++                                 m_module->code_ranges[m_module->num_code_ranges - 1].end};
++  if ((bounds.start | bounds.end) & 3u)
++    return {};
++  return bounds;
+ }
+ 
+ bool StaticRecompCore::CanLinkFallbackTo(u32 address) const
+diff --git a/Source/Core/Core/PowerPC/Jit64/JitAsm.cpp b/Source/Core/Core/PowerPC/Jit64/JitAsm.cpp
+--- a/Source/Core/Core/PowerPC/Jit64/JitAsm.cpp
++++ b/Source/Core/Core/PowerPC/Jit64/JitAsm.cpp
+@@ -110,12 +110,27 @@
+   FixupBranch static_recomp_exit;
+   if (m_jit.IsStaticRecompFallback())
+   {
++    // Fixed module ranges cannot change while these dispatcher routines are live.
++    // Addresses outside the bounds cannot yield to native code.
++    const StaticRecompRange bounds =
++        g_static_recomp_core ? g_static_recomp_core->GetFixedNativeCodeBounds() : StaticRecompRange{};
++    FixupBranch outside_native_bounds;
++    if (bounds.end > bounds.start)
++    {
++      MOV(32, R(RSCRATCH), PPCSTATE(pc));
++      SUB(32, R(RSCRATCH), Imm32(bounds.start));
++      CMP(32, R(RSCRATCH), Imm32(bounds.end - bounds.start));
++      outside_native_bounds = J_CC(CC_AE);
++    }
++
+     ABI_PushRegistersAndAdjustStack({}, 0);
+     MOV(32, R(ABI_PARAM1), PPCSTATE(pc));
+     ABI_CallFunction(StaticRecompShouldYieldAt);
+     ABI_PopRegistersAndAdjustStack({}, 0);
+     TEST(32, R(ABI_RETURN), R(ABI_RETURN));
+     static_recomp_exit = J_CC(CC_NZ, Jump::Near);
++    if (bounds.end > bounds.start)
++      SetJumpTarget(outside_native_bounds);
+   }
+ 
+   // The following is a translation of JitBaseBlockCache::Dispatch into assembly.
