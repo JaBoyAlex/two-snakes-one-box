@@ -39,6 +39,8 @@ Use the runtime staging directory from `build_runtime.py` as the package input. 
 
 The portable package includes CMake's command-line help and license notices. Its generated HTML manual is omitted. The bundled compiler retains the x64 Windows target and drops the separate ARM64, ARMv7 and x86 target directories.
 
+The Windows package includes the built-in game settings matched by `supported-builds.json`. Dolphin Qt themes and the Qt debugger's symbol database are omitted. Shared runtime data, including the GameCube and on-screen fonts and their notices, are included.
+
 For a local installation test, add `--stage-only` with a new `--version`. If the workspace is synced, pass `--staging-root` pointing to a private, non-synced folder. RecompLauncher can place generated game data beside a portable build. In beta 68, open Settings, choose **Bring Your Games**, then **Pick a Folder**, and select the reported folder containing `TwinSnakes.exe` and `recomplauncher.json`. Choose **Go Through Them** and **Add Without Updates**. The **Add a build** screen in developer mode is also available. Check both disc prompts, prepare a fresh data directory, and verify that the display and resolution choices persist through **Play**. Test the same setup in Big Picture before submitting a release. [RecompLauncher developer guide](https://github.com/elripalda/RecompLauncher/blob/main/docs/DEVELOPERS.md#checking-your-file)
 
 RecompLauncher checks the GameCube disc ID before setup. The setup program checks disc order, revision, and the SHA-256 of each normalized disc. The manifest leaves whole-file dump checks to setup so RVZ and GCZ files are compared after conversion.

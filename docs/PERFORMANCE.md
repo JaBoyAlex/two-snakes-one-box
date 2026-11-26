@@ -569,6 +569,18 @@ The packaged runner restored a checkpoint from each launch and sampled 33 second
 | Liquid | Vulkan | 59.85 | 17.18 ms |
 | Escape Route | Direct3D 11 | 59.83 | 17.28 ms |
 
+### Dev.35 Disc 1 boss replays
+
+Three isolated dev.34 launches loaded the Tank, Ninja and first Sniper Wolf fights from USA Very Easy practice saves. Each encounter responded to scripted analog input and preserved its memory-card save. [Practice-save source](https://www.speedrun.com/mgstts/resources)
+
+The dev.35 packaged runner restored those checkpoints for 33 seconds each in windowed Direct3D 11 at 4× internal resolution, with shared threads, a seeded shader cache and Cubeb audio. Each replay shut down normally at 100% median game speed. None of the 397 samples fell below 95%. Windows process loopback captured 27 seconds of audible output from each replay with zero reported packet discontinuities or valid timestamp gaps above 2 ms.
+
+| Starting checkpoint | Longest render interval | Longest vertical blank |
+| --- | ---: | ---: |
+| Tank | 19.55 ms | 19.68 ms |
+| Ninja | 20.73 ms | 20.14 ms |
+| Sniper Wolf | 20.20 ms | 19.46 ms |
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.

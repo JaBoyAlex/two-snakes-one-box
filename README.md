@@ -2,7 +2,7 @@
 
 A work-in-progress native recompilation project for **Metal Gear Solid: The Twin Snakes** on GameCube, with local-disc setup and RecompLauncher integration.
 
-**Development status.** The Windows dev.34 package uses a locally compiled native boot module and JIT fallback for the main gameplay module. It includes the early save-state rendering fix, the faster fallback dispatcher and in-session controller port switching. The regular launcher uses shared CPU and video threads. RecompLauncher beta 68 prepared both discs through Easy Setup with an earlier portable build. Private updates using the beta 68 installer preserved prepared data, settings and saves. A complete playthrough remains a release gate.
+**Development status.** The Windows dev.35 package uses a locally compiled native boot module and JIT fallback for the main gameplay module. It includes the early save-state rendering fix, the faster fallback dispatcher and in-session controller port switching. The regular launcher uses shared CPU and video threads. RecompLauncher beta 68 prepared both discs through Easy Setup with an earlier portable build. A private update using the beta 68 installer preserved prepared data, settings and saves. A complete playthrough and a clean Windows account install remain release gates.
 
 The dev.21 Windows build adds Direct3D 11 under **Game Settings → Graphics backend**. Its first launch may spend time compiling shaders.
 
@@ -31,7 +31,7 @@ See [BUILDING.md](docs/BUILDING.md) for the source workflow, [STATUS.md](docs/ST
 
 Standalone and RecompLauncher launches use the same controller setup. The Windows runtime automatically maps the first recognized SDL gamepad to port 1, uses a saved GameCube controller profile if one exists, and falls back to the keyboard when no gamepad is available. Physical XInput buttons and automatic reassignment after reconnect have been verified on Windows. Other controller types still need hardware testing.
 
-On Windows dev.34, press **F2** or choose **File → Controller Port 1 / 4** to move the current mapping between ports during play. The shortcut needs a standard emulated GameCube controller on port 1 and an available port 4. Each new session starts with the configured port assignments.
+On Windows dev.34 and later, press **F2** or choose **File → Controller Port 1 / 4** to move the current mapping between ports during play. The shortcut needs a standard emulated GameCube controller on port 1 and an available port 4. Each new session starts with the configured port assignments.
 
 Windows x64 is the first target. Linux and macOS packaging will follow verified builds on those platforms.
 

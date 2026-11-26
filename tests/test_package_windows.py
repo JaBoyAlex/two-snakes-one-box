@@ -10,10 +10,32 @@ from zipfile import ZipFile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from bootstrap import prepare_windows_tools
 import build_runtime
-from package_windows import check_package_tree
+from package_windows import check_package_tree, copy_game_runtime
 
 
 class PackageWindowsTests(unittest.TestCase):
+    def test_packages_settings_for_supported_builds_and_keeps_shared_assets(self):
+        keep = {'Sys/GameSettings/G.ini', 'Sys/GameSettings/GGS.ini',
+                'Sys/GameSettings/GGSEA4.ini', 'Sys/GameSettings/GGSEA4r0.ini',
+                'Sys/Resources/OSD_Font.ttf', 'Sys/GC/font-licenses.txt', 'Sys/wiitdb-en.txt',
+                'Sys/Load/GraphicMods/Common/config.json', 'sdk/totaldb.dsy'}
+        omit = {'Sys/GameSettings/GGSPA4.ini', 'Sys/GameSettings/GGSEA4r1.ini',
+                'Sys/Themes/example/icon.png', 'Sys/totaldb.dsy'}
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'source'
+            for name in keep | omit:
+                path = source / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(name, encoding='ascii')
+
+            destination = root / 'package'
+            copy_game_runtime(source, destination, [{'game_id': 'GGSEA4', 'revision': 0}])
+            self.assertEqual({path.relative_to(destination).as_posix()
+                              for path in destination.rglob('*') if path.is_file()}, keep)
+            for name in keep:
+                self.assertEqual((destination / name).read_text(encoding='ascii'), name)
+
     def test_runtime_patch_stack_can_be_reapplied(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

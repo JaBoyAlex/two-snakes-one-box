@@ -31,6 +31,26 @@ def check_package_tree(root, *, runtime=False):
             raise SystemExit(f'Private file in package input: {relative.as_posix()}')
 
 
+def copy_game_runtime(runtime, destination, builds):
+    game_settings = set()
+    for build in builds:
+        game_id = build['game_id'].casefold()
+        revision = build['revision']
+        # The runtime loads system, region-independent, game and revision settings.
+        game_settings.update((f'{game_id[0]}.ini', f'{game_id[:3]}.ini',
+                              f'{game_id}.ini', f'{game_id}r{revision}.ini'))
+
+    def omit_unused_resources(folder, entries):
+        relative = Path(folder).relative_to(runtime).as_posix().casefold()
+        if relative == 'sys':
+            return [name for name in entries if name.casefold() in {'themes', 'totaldb.dsy'}]
+        if relative == 'sys/gamesettings':
+            return [name for name in entries if name.casefold() not in game_settings]
+        return ()
+
+    shutil.copytree(runtime, destination, ignore=omit_unused_resources)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--runtime', type=Path, default=ROOT / '.local/runtime')
@@ -72,7 +92,8 @@ def main():
         shutil.copy2(ROOT / name, destination)
     shutil.copytree(ROOT / 'docs', stage / 'docs')
     shutil.copy2(args.launcher, stage / 'TwinSnakes.exe')
-    shutil.copytree(args.runtime, stage / 'runtime')
+    builds = json.loads((ROOT / 'supported-builds.json').read_text(encoding='utf-8'))['builds']
+    copy_game_runtime(args.runtime, stage / 'runtime', builds)
     for name in VC_FILES:
         shutil.copy2(vc_runtime / name, stage / 'runtime' / name)
     shutil.copytree(args.tools / 'python', stage / 'python')
