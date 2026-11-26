@@ -83,6 +83,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
     env.pop('STATICRECOMP_DISPATCH_SAMPLES', None)
     env.pop('STATICRECOMP_TRACE_FILE', None)
     env.pop('STATICRECOMP_FALLBACK_RANGES', None)
+    env.pop('STATICRECOMP_PROFILE_FALLBACK_RANGES', None)
     if alternate_disc is not None:
         env['MODERNGEKKO_ALTERNATE_DISC'] = str(alternate_disc)
     if dispatch_samples and mode == 'aot':

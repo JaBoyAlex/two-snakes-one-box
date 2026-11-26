@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
@@ -40,3 +41,15 @@ class BenchmarkTests(unittest.TestCase):
                 self.assertEqual(summary['completed'], advancing)
                 self.assertEqual(succeeded, advancing)
                 self.assertEqual('median_speed' in summary, advancing)
+
+    def test_ignores_fallback_ranges_in_inherited_environment(self):
+        ranges = dict.fromkeys(('STATICRECOMP_FALLBACK_RANGES',
+                               'STATICRECOMP_PROFILE_FALLBACK_RANGES'), '100-200')
+        with (TemporaryDirectory() as directory, patch.dict(os.environ, ranges),
+              patch.object(benchmark_boot.subprocess, 'Popen') as launch, patch('builtins.print')):
+            process = launch.return_value
+            process.poll.return_value = 0
+            process.returncode = 0
+            benchmark_boot.benchmark('aot', 'runner', 'disc', 'module', Path(directory),
+                                     False, 'Null', 1, None, False)
+            self.assertTrue(ranges.keys().isdisjoint(launch.call_args.kwargs['env']))
