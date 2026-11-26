@@ -1,0 +1,91 @@
+diff --git a/Source/Core/Core/State.cpp b/Source/Core/Core/State.cpp
+--- a/Source/Core/Core/State.cpp
++++ b/Source/Core/Core/State.cpp
+@@ -26,6 +26,7 @@
+ #include "Common/IOFile.h"
+ #include "Common/Logging/Log.h"
+ #include "Common/MsgHandler.h"
++#include "Common/ScopeGuard.h"
+ #include "Common/Thread.h"
+ #include "Common/TimeUtil.h"
+ #include "Common/TransferableSharedMutex.h"
+@@ -48,6 +49,7 @@
+ 
+ #include "UICommon/UICommon.h"
+ 
++#include "VideoCommon/Fifo.h"
+ #include "VideoCommon/FrameDumpFFMpeg.h"
+ #include "VideoCommon/OnScreenDisplay.h"
+ #include "VideoCommon/VideoBackendBase.h"
+@@ -123,6 +125,12 @@
+     p.SetMeasureMode();
+     return;
+   }
++
++  // The CPU job runs after the host releases the FIFO pause. Keep the command processor
++  // paused until its state and the matching timing events have both been transferred.
++  auto& fifo = system.GetFifo();
++  fifo.BeginStateTransfer();
++  Common::ScopeGuard restore_fifo([&] { fifo.EndStateTransfer(); });
+ 
+   // Movie must be done before the video backend, because the window is redrawn in the video backend
+   // state load, and the frame number must be up-to-date.
+diff --git a/Source/Core/VideoCommon/Fifo.h b/Source/Core/VideoCommon/Fifo.h
+--- a/Source/Core/VideoCommon/Fifo.h
++++ b/Source/Core/VideoCommon/Fifo.h
+@@ -53,6 +53,8 @@
+   void Prepare();  // Must be called from the CPU thread.
+   void DoState(PointerWrap& f);
+   void PauseAndLock();
++  void BeginStateTransfer();
++  void EndStateTransfer();
+   void RestoreState(bool was_running);
+   void UpdateWantDeterminism(bool want);
+   bool UseDeterministicGPUThread() const { return m_use_deterministic_gpu_thread; }
+@@ -89,6 +91,7 @@
+   Common::BlockingLoop m_gpu_mainloop;
+ 
+   Common::Flag m_emu_running_state;
++  Common::Flag m_state_transfer_in_progress;
+ 
+   // Most of this array is unlikely to be faulted in...
+   u8 m_fifo_aux_data[FIFO_SIZE]{};
+diff --git a/Source/Core/VideoCommon/Fifo.cpp b/Source/Core/VideoCommon/Fifo.cpp
+--- a/Source/Core/VideoCommon/Fifo.cpp
++++ b/Source/Core/VideoCommon/Fifo.cpp
+@@ -78,6 +78,26 @@
+   m_gpu_mainloop.WaitYield(std::chrono::milliseconds(100), Host_YieldToUI);
+ }
+ 
++void FifoManager::BeginStateTransfer()
++{
++  if (!m_system.IsDualCoreMode())
++    return;
++
++  SyncGPU(SyncGPUReason::Other);
++  m_state_transfer_in_progress.Set();
++  // Wait for an iteration that observes the pause. Video state callbacks still run on the
++  // GPU thread because async requests are serviced before it checks the pause flag.
++  m_gpu_mainloop.Wakeup();
++  m_gpu_mainloop.Wait();
++  m_gpu_mainloop.AllowSleep();
++}
++
++void FifoManager::EndStateTransfer()
++{
++  if (m_state_transfer_in_progress.TestAndClear() && m_emu_running_state.IsSet())
++    m_gpu_mainloop.Wakeup();
++}
++
+ void FifoManager::RestoreState(const bool was_running)
+ {
+   if (was_running)
+@@ -291,7 +311,7 @@
+         AsyncRequests::GetInstance()->PullEvents();
+ 
+         // Do nothing while paused
+-        if (!m_emu_running_state.IsSet())
++        if (!m_emu_running_state.IsSet() || m_state_transfer_in_progress.IsSet())
+           return;
+ 
+         if (m_use_deterministic_gpu_thread)

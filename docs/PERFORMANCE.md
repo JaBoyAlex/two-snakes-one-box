@@ -523,9 +523,17 @@ A separate dev.28 MSVC map run sampled the host instruction pointer for 11 secon
 
 Two early flashback restores with separate threads acknowledged the state and then produced zero new present callbacks over 56 seconds. The same early stall reproduced in a short Direct3D 11 JIT-only run and in a Vulkan hybrid run. Separate-thread Direct3D 11 booted and advanced normally without a restore. A short Direct3D 11 run that waited for 240 present callbacks before requesting the restore advanced for its full 14-second sample. The two shared-thread comparisons both advanced and completed the full replay.
 
+With the same delayed restore in both modes, all four 56-second Direct3D 11 replays at 4× completed at 100% median game speed. The shared runs had 6 of 450 samples below 95% and a maximum vertical blank interval of 50.20 ms. The separate runs had 5 of 449 below 95% and a maximum interval of 33.77 ms. A stack snapshot from an early JIT-only stall placed the CPU thread in the vertical-blank throttle's Windows precision timer. The video thread was waiting for FIFO work.
+
+The emulated clock continued advancing at the expected rate in the stalled run. Disabling the precision timer reproduced the stall. The graphics FIFO read position stayed fixed with an interrupt pending, and exposing duplicate presentations showed zero newly drawn frames. The trace captured the video thread queueing a new command processor interrupt after the graphics state was loaded and before the timing queue was replaced. The restore discarded the event, leaving its pending flag set. The fix holds FIFO command processing during the complete state transfer, with graphics-thread state callbacks still enabled. It preserves both the CPU's running or paused state and the interrupts stored in the checkpoint.
+
+Dev.30 restored the flashback at the first observed present with separate CPU and video threads on Direct3D 11 (hybrid and JIT-only) and Vulkan (hybrid). A shared-thread Direct3D 11 hybrid control also completed. All four 11-second replays rendered about 36 new frames per second, reached 100% median game speed, had zero of 178 samples below 95%, and shut down normally. Offscreen Vulkan also passed 20 resume and reload cycles at the Dock in each thread mode. The regular launcher still uses shared threads.
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.
+
+Two 56-second flashback replays per target at 4× Direct3D 11 held 100% median game speed. The generic build had two of 450 samples below 95% speed and the x86-64-v3 build had seven. The windowed flashback evidence favors keeping the generic build.
 
 ## Tool comparisons
 

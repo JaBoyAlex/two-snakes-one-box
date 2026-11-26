@@ -53,6 +53,7 @@
   "patches/recompcore-register-sync.patch",
   "patches/recompcore-savestate-disc-check.patch",
   "patches/recompcore-savestate-load-result.patch",
+  "patches/recompcore-savestate-fifo.patch",
   "patches/recompcore-trim-native-chunk-lookup.patch",
   "patches/recompcore-twin-snakes-idle.patch",
   "patches/recompcore-windows-fst-rename-retry.patch",
