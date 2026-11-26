@@ -65,6 +65,7 @@
   "docs/ROADMAP.md",
   "docs/STATUS.md",
   "docs/PERFORMANCE.md",
+  "tests/test_benchmark_boot.py",
   "tests/test_discs.py",
   "tests/test_package_windows.py",
   "tests/test_prepare.py",

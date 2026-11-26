@@ -46,7 +46,7 @@ Use `--compare-threading` to run shared and separate CPU/video threads in both o
 
 Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay. Benchmark profiles and logs default to a subdirectory of the system temporary directory. Use `--output PATH` to retain traces elsewhere. One run in a synced workspace failed to replace the test profile's filesystem metadata (`IOS_FS: Failed to rename temporary FST file`). Repeat runs with isolated profiles outside the synced workspace completed successfully.
 
-The benchmark requires advancing present callbacks to report speed or frame-rate statistics. A stalled restore retains its raw status samples and reports `presentation_advanced: false` without displaying the last sampled timing values as active playback.
+The benchmark requires both advancing present callbacks and newly drawn frames to report speed and frame-rate statistics. A stalled restore retains its raw status samples. If the renderer keeps presenting the same frame, it reports `presentation_advanced: true` and `drawn_frames_advanced: false` and fails the replay.
 
 For an order-reversed graphics comparison, pair `--windowed Vulkan` with `--compare-backend D3D`. Use `--offscreen Vulkan` for a headless rendering comparison with audio output disabled. Each leg starts from its own profile. To compare warm runs, pass a `--shader-cache-seed` containing cache files for both backends.
 

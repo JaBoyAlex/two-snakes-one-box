@@ -150,7 +150,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                         samples[-1].update({'vps': vps, 'fps': fps})
                 if now - began_sampling >= seconds + 3:
                     interval_end = {name: log_size(path) for name, path in interval_logs.items()}
-                    completed = sample_end[2] > sample_start[2]
+                    completed = True
                     break
         finally:
             if process.poll() is None:
@@ -165,9 +165,12 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                     process.wait(timeout=5)
 
     presentation_advanced = sample_start is not None and sample_end[2] > sample_start[2]
+    drawn_frames_advanced = sample_start is not None and sample_end[1] > sample_start[1]
+    replay_advanced = presentation_advanced and drawn_frames_advanced
+    completed = completed and replay_advanced
     summary = {'cpu': mode, 'graphics': backend, 'headless': not windowed, 'exit_code': process.returncode,
                'completed': completed, 'forced_stop': forced_stop,
-               'presentation_advanced': presentation_advanced,
+               'presentation_advanced': presentation_advanced, 'drawn_frames_advanced': drawn_frames_advanced,
                'startup_seconds': round(booted_at - start, 2) if booted_at is not None else None,
                'sample_count': len(samples), 'samples': samples,
                'internal_scale_requested': internal_scale, 'fullscreen_requested': fullscreen}
@@ -182,7 +185,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
             name: summarize_intervals(path, interval_start[name], interval_end[name])
             for name, path in interval_logs.items()
         }
-    if presentation_advanced:
+    if replay_advanced:
         if windowed:
             summary.update({f'median_{key}': round(statistics.median(sample[key] for sample in samples), 3)
                             for key in ('vps', 'fps')})
