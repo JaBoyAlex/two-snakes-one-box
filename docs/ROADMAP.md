@@ -44,8 +44,11 @@ Work through the gates in order. Runtime fixes and installer tests can overlap o
 
 ## 5. Frame-rate work
 
+Read-only timing traces can run alongside baseline testing. The first private prototype should render the Dock at 120 Hz while keeping the original simulation schedule. Use the same checkpoint and input for the original and candidate runs, then extend the test to an in-engine dialogue scene. Before exposing the mode, verify the stable playthrough and display gates above.
+
 - Trace gameplay updates, animation, physics, camera transforms, input sampling and decoder frame timing using replays at the original game speed.
 - Prototype direct rendering from camera and animation evaluated at the presentation cadence. Compare gameplay state, script timing, and audio against the original run.
+- Verify that additional draws leave authoritative gameplay state unchanged and produce a new scene render. Compare matched guest simulation ticks and report repeated presentations separately.
 - Include real-time cutscenes. Compare camera cuts, animation cues and dialogue timing with the original. Preserve source cadence and audio sync for prerecorded footage before evaluating optional smoothing.
 - Keep the original frame-rate mode available.
 - Test fixed 60/120/144 Hz and variable refresh at monitor-native output without changing game speed or audio timing.

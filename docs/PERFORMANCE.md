@@ -44,6 +44,8 @@ The benchmark reports startup time from process launch to the first poll that ob
 
 Use `--compare-threading` to run shared and separate CPU/video threads in both orders against the same runner and checkpoint. It defaults to hybrid execution. With `--shader-cache-seed PATH`, every run starts with its own copy of the supplied local `Cache` directory. Seed from a completed run with the same backend and GPU so each case starts with the same pipeline data.
 
+Use `--xfb-copies guest-memory` and `--xfb-copies texture-only` on matched runs to measure the cost of framebuffer readback. Without this flag, the benchmark uses the runner's default in its isolated profile.
+
 Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay. Benchmark profiles and logs default to a subdirectory of the system temporary directory. Use `--output PATH` to retain traces elsewhere. One run in a synced workspace failed to replace the test profile's filesystem metadata (`IOS_FS: Failed to rename temporary FST file`). Repeat runs with isolated profiles outside the synced workspace completed successfully.
 
 The benchmark requires both advancing present callbacks and newly drawn frames to report speed and frame-rate statistics. A stalled restore retains its raw status samples. If the renderer keeps presenting the same frame, it reports `presentation_advanced: true` and `drawn_frames_advanced: false` and fails the replay. The summary also reports the longest observed pause and the pause at the end of the window for each counter. Check these when a replay advanced before it froze. The status poll runs about four times per second, so use the interval logs for shorter hitches.
@@ -614,6 +616,22 @@ Four 24-second dev.36 Tower A replays compared texture-only XFB copies with copi
 
 The comparison covers one checkpoint and one GPU. Dev.37 defaults to copying XFB data to guest memory for the Codec backdrop and Photo Album.
 
+### Dev.37 sustained profiling
+
+The packaged runner replayed Tower A and the Underground Passage flashback for 75 seconds each at 4×. The runs used the dev.37 framebuffer default, shared threads and a warm shader cache. Each Windows loopback capture recorded 69 seconds of audible output with zero packet discontinuities.
+
+| Checkpoint and renderer | Median / minimum game speed | Samples below 95% | Longest render interval | Longest vertical blank |
+| --- | ---: | ---: | ---: | ---: |
+| Tower A, Vulkan | 100.0% / 66.1% | 20 / 300 | 37.04 ms | 28.43 ms |
+| Tower A, Direct3D 11 | 100.0% / 87.1% | 15 / 300 | 51.71 ms | 48.36 ms |
+| Underground Passage flashback, Direct3D 11 | 99.9% / 79.2% | 46 / 300 | 333.31 ms | 47.63 ms |
+
+The Vulkan slowdown appeared in three clusters. A 75-second repeat with texture-only copies reached 100% median and 99.0% minimum speed, with zero of 301 samples below 95%. An accurate hybrid repeat reached a 97.3% minimum with zero of 300 samples below 95%, and an accurate JIT-only repeat held 100% over 301 samples. The initial Tower A slowdown remains intermittent.
+
+A matched 62-second Direct3D 11 flashback comparison reproduced the cost of guest-memory copies. The accurate run had 36 of 249 samples below 95%, with a minimum of 80.8%. The texture-only run had six of 249 samples below 95%, with a minimum of 92.9%. Most of the dips in both profiles fell about 40–50 seconds into the sampled replay. A separate accurate trace overlapped its longest VBlank gap with a 2.2 ms framebuffer download and measured about 47 ms of CPU time on the shared thread during the gap. The download adds work to an interval that is already CPU-heavy.
+
+Three 60-second Direct3D 11 flashback replays on the tracing build kept accurate copies enabled. The shared-thread 4× run had 33 of 241 samples below 95%, with a minimum of 84.2%. Separate threads at 4× had 22 of 241, with a 91.1% minimum and a longest VBlank of 34.12 ms. Shared threads at 1× still had 30 of 241 samples below 95%. Each capture recorded about 54 seconds of audio with zero packet discontinuities. These results favor reducing CPU work during the heavy section.
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.
@@ -699,6 +717,8 @@ PowerPC instruction fingerprints identified the matching SDK routines in the USA
 | The traced engine viewport call sets up the draw | 29.97 Hz | 59.93 Hz |
 
 The same engine viewport call site tracked the display-copy cadence in both scenes. Four perspective upload sites also followed roughly 30 Hz in dialogue and 60 Hz at the Dock. In a follow-up trace, one overlay call site built a view matrix into the same destination in both scenes. For that destination, the median interval was 33.369 ms across 372 calls in dialogue and 16.679 ms across 740 calls at the Dock. In dialogue the same call site also built matrices into a second destination twice per update. The USA matrix routine matches the PAL `C_MTXLookAt` symbol position relative to neighboring SDK functions and calls the expected vector normalization and cross-product helpers. Animation and camera-input update rates still need separate traces. [PAL SDK symbol reference](https://github.com/alphanu1/msg-twinsnakes-recomp/blob/d1fbfec2281042d2eaef43dbb20afedb0ae1d364/config/symbols/main.dol.symbols.txt) [libogc view-matrix API](https://github.com/devkitPro/libogc/blob/master/gc/ogc/gu.h)
+
+A separate trace grouped SDK calls between guest framebuffer copies. Across 512 Dock intervals near 60 Hz, the median interval contained 77 position-matrix uploads, 11 normal-matrix uploads, 38 projections and four look-at calls. The Dock trace found ten position-matrix call sites. In the Underground Passage flashback, the typical draw uploaded 19 position and three normal matrices in both the 30 and 60 Hz parts. This measures what each draw consumes. Identifying which camera and model inputs can be evaluated for an extra draw is the next step.
 
 Prototype rendering directly from camera and animation evaluated at the presentation cadence, where the game's data supports it. Start with a known gameplay replay and an in-engine dialogue scene. Keep the original physics and script update schedule and audio clock, and verify motion, camera cuts, and dialogue timing with repeatable input. A higher simulation rate would require validating each frame-dependent update and callback. Keep the original guest speed limit during these experiments.
 

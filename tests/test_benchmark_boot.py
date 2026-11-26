@@ -11,6 +11,23 @@ import benchmark_boot
 
 
 class BenchmarkTests(unittest.TestCase):
+    def test_xfb_override_keeps_frame_interval_logging(self):
+        for mode, texture_only in (('guest-memory', 'False'), ('texture-only', 'True')):
+            with (self.subTest(mode=mode), TemporaryDirectory() as directory,
+                  patch.object(benchmark_boot.subprocess, 'Popen') as launch, patch('builtins.print')):
+                work = Path(directory)
+                process = launch.return_value
+                process.poll.return_value = 0
+                process.returncode = 0
+                benchmark_boot.benchmark('aot', 'runner', 'disc', 'module', work,
+                                         True, 'D3D', 1, None, False,
+                                         frame_times=True, xfb_copies=mode)
+                graphics = (work / 'user/Config/GFX.ini').read_text()
+                self.assertIn('[Settings]\nLogRenderTimeToFile = True', graphics)
+                self.assertIn(f'[Hacks]\nXFBToTextureEnable = {texture_only}', graphics)
+                summary = json.loads((work / 'summary.json').read_text())
+                self.assertEqual(summary['xfb_copies_requested'], mode)
+
     def test_reports_ending_draw_pause_while_duplicate_presents_continue(self):
         with TemporaryDirectory() as directory:
             work = Path(directory)

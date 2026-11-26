@@ -68,7 +68,7 @@ def summarize_counter_pauses(samples, counter):
 
 def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load_state, dispatch_samples,
               *, dual_core=None, frame_times=False, internal_scale=1, fullscreen=False,
-              alternate_disc=None, shader_cache_seed=None):
+              alternate_disc=None, shader_cache_seed=None, xfb_copies=None):
     control = work / 'control'
     command_dir = control / 'commands'
     command_dir.mkdir(parents=True)
@@ -80,7 +80,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                                    f'backend=Vulkan\nfullscreen={str(fullscreen).lower()}\n',
                                    encoding='ascii')
     config = user / 'Config'
-    if dual_core is not None or frame_times or load_state:
+    if dual_core is not None or frame_times or load_state or xfb_copies:
         config.mkdir()
     dolphin_settings = f'[Core]\nCPUThread = {dual_core}\n' if dual_core is not None else ''
     if load_state:
@@ -88,11 +88,17 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
     if dolphin_settings:
         (config / 'Dolphin.ini').write_text(dolphin_settings, encoding='ascii')
     interval_logs = {}
+    graphics_settings = ''
     if frame_times:
         logs = user / 'Logs'
         logs.mkdir()
-        (config / 'GFX.ini').write_text('[Settings]\nLogRenderTimeToFile = True\n', encoding='ascii')
+        graphics_settings = '[Settings]\nLogRenderTimeToFile = True\n'
         interval_logs = {'render': logs / 'render_times.txt', 'vblank': logs / 'vblank_times.txt'}
+    if xfb_copies:
+        texture_only = xfb_copies == 'texture-only'
+        graphics_settings += f'\n[Hacks]\nXFBToTextureEnable = {texture_only}\n'
+    if graphics_settings:
+        (config / 'GFX.ini').write_text(graphics_settings, encoding='ascii')
     env = dict(os.environ, MODERNGEKKO_STATICRECOMP='1' if mode == 'aot' else '0')
     env.pop('STATICRECOMP_DISPATCH_SAMPLES', None)
     env.pop('STATICRECOMP_TRACE_FILE', None)
@@ -200,6 +206,8 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
             summary['checkpoint_error'] = checkpoint_error or 'No successful load acknowledgement from the runtime'
     if dual_core is not None:
         summary['dual_core_requested'] = dual_core
+    if xfb_copies:
+        summary['xfb_copies_requested'] = xfb_copies
     if frame_times and completed:
         summary['frame_intervals_ms'] = {
             name: summarize_intervals(path, interval_start[name], interval_end[name])
@@ -246,6 +254,8 @@ def main():
     parser.add_argument('--shader-cache-seed', type=Path, metavar='CACHE_DIR',
                         help='Copy a local Cache directory into every isolated profile before launch')
     parser.add_argument('--frame-times', action='store_true', help='Record render and video update intervals in windowed mode')
+    parser.add_argument('--xfb-copies', choices=('guest-memory', 'texture-only'),
+                        help='Override framebuffer copies in the isolated profile')
     parser.add_argument('--internal-scale', type=int, default=1, metavar='N',
                         help='Integer EFB render scale in the isolated profile, from 1 to 12 (default: 1)')
     parser.add_argument('--fullscreen', action='store_true', help='Start the windowed benchmark in borderless fullscreen')
@@ -328,7 +338,7 @@ def main():
                                   load_state, args.dispatch_samples, dual_core=dual_core,
                                   frame_times=args.frame_times, internal_scale=args.internal_scale,
                                   fullscreen=args.fullscreen, alternate_disc=alternate_disc,
-                                  shader_cache_seed=shader_cache_seed))
+                                  shader_cache_seed=shader_cache_seed, xfb_copies=args.xfb_copies))
     print(f'Private logs and samples: {work}')
     return 0 if all(outcomes) else 1
 
