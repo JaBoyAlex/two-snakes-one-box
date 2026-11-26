@@ -165,6 +165,13 @@ def main():
         for license_path in directory.glob('LICENSE*'):
             if license_path.is_file():
                 shutil.copy2(license_path, licenses / f'{name}-{license_path.name}')
+    codehandler = (dolphin / 'docs/codehandler.s').read_text(encoding='utf-8')
+    notice, marker, _ = codehandler.partition('\n.text')
+    if not marker:
+        raise SystemExit('Could not locate the bundled Gecko code handler notice')
+    (licenses / 'Gecko-codehandler-MIT.txt').write_text(
+        '\n'.join(line.removeprefix('#') for line in notice.splitlines()).rstrip() + '\n',
+        encoding='utf-8')
     if os.name == 'nt':
         stage_windows_external_notices(dolphin / 'Externals', licenses / 'RecompCore/Externals')
     shutil.copy2(ROOT / 'dependencies.lock.json', output / 'dependencies.lock.json')
