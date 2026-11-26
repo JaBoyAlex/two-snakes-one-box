@@ -88,6 +88,43 @@ class PrepareTests(unittest.TestCase):
         self.assertEqual(dol.read_bytes(), b'test DOL')
         self.assertEqual(list(self.build.iterdir()), [extracted])
 
+    def test_setup_reuses_matching_disc_data_across_runner_builds(self):
+        previous = self.root / 'cache' / 'builds' / 'old'
+        first = previous / 'disc1'
+        self.write_extraction(first)
+        current = self.root / 'cache' / 'builds' / 'new'
+        record = {
+            'identity': {'format': twin_snakes.BUILD_FORMAT, 'recompiler': 'same',
+                         'discs': ['first iso', 'second iso'], 'runner': 'old'},
+            'discs': [
+                {'iso_sha256': 'first iso', 'root': 'cache/builds/old/disc1'},
+                {'iso_sha256': 'second iso', 'root': '../outside/disc2'},
+            ],
+        }
+        identity = {**record['identity'], 'runner': 'new'}
+        roots = twin_snakes.reusable_disc_roots(self.root.resolve(), record, identity)
+        self.assertEqual(roots, {0: first.resolve()})
+        self.assertEqual(twin_snakes.reusable_disc_roots(
+            self.root, record, {**identity, 'recompiler': 'new'}), {})
+        self.assertEqual(twin_snakes.reusable_disc_roots(
+            self.root, record, {**identity, 'discs': ['different iso', 'second iso']}), {})
+
+        with patch.object(twin_snakes, 'run') as run:
+            reused = twin_snakes.extract_disc(None, self.disc, current, self.root, None, None,
+                                              cached_extraction=roots[0])
+            self.assertEqual(reused, first.resolve())
+            run.assert_not_called()
+        self.assertFalse(current.exists())
+
+        (first / 'sys/main.dol').write_bytes(b'damaged previous extraction')
+        with patch.object(twin_snakes, 'run', side_effect=lambda command, *_args, **_kw:
+                          self.write_extraction(command[-1])) as run:
+            repaired = twin_snakes.extract_disc(None, self.disc, current, self.root, None, None,
+                                                cached_extraction=roots[0])
+            run.assert_called_once()
+        self.assertEqual(repaired, current / 'disc1')
+        self.assertEqual((repaired / 'sys/main.dol').read_bytes(), b'test DOL')
+
     def test_link_retry_does_not_reuse_partial_native_output(self):
         extracted = self.build / 'disc1'
         self.write_extraction(extracted)

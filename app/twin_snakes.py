@@ -211,7 +211,9 @@ def extraction_ready(extracted, dol_sha256, rel_layout):
     return True
 
 
-def extract_disc(iso, disc, build, runtime, log, rel_layout):
+def extract_disc(iso, disc, build, runtime, log, rel_layout, *, cached_extraction=None):
+    if cached_extraction is not None and extraction_ready(cached_extraction, disc.dol_sha256, rel_layout):
+        return cached_extraction
     extracted = build / f'disc{disc.number + 1}'
     if extraction_ready(extracted, disc.dol_sha256, rel_layout):
         return extracted
@@ -247,8 +249,9 @@ def native_module_ready(module, *, allow_legacy=False):
 
 
 def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layout=None,
-               experimental_rel=False):
-    extracted = extract_disc(iso, disc, build, runtime, log, rel_layout)
+               experimental_rel=False, cached_extraction=None):
+    extracted = extract_disc(iso, disc, build, runtime, log, rel_layout,
+                             cached_extraction=cached_extraction)
     dol = extracted / 'sys/main.dol'
     module_build = build / 'modules' / disc.dol_sha256[:16]
     suffix = '.dll' if os.name == 'nt' else ('.dylib' if sys.platform == 'darwin' else '.so')
@@ -298,6 +301,28 @@ def build_disc(iso, disc, build, runtime, env, cmake, compiler, log, *, rel_layo
     return extracted, module
 
 
+def reusable_disc_roots(data, record, identity):
+    try:
+        previous = record['identity']
+        discs = record['discs']
+        if len(discs) != 2 or any(previous[key] != identity[key] for key in ('format', 'recompiler', 'discs')):
+            return {}
+    except (KeyError, TypeError):
+        return {}
+
+    builds = data / 'cache' / 'builds'
+    roots = {}
+    for index, (entry, expected) in enumerate(zip(discs, identity['discs'])):
+        try:
+            root = (data / entry['root']).resolve()
+            if (entry['iso_sha256'] == expected and root.parent.parent == builds
+                    and root.name == f'disc{index + 1}'):
+                roots[index] = root
+        except (KeyError, TypeError, OSError, ValueError):
+            continue
+    return roots
+
+
 def prepare(args, runtime, data, log):
     if not args.disc1 or not args.disc2:
         raise DiscError('Both --disc1 and --disc2 are required for setup.')
@@ -333,6 +358,7 @@ def prepare(args, runtime, data, log):
     key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:32]
     build = cache / 'builds' / key
     completed = build / 'prepared.json'
+    record = None
     if completed.is_file():
         record = json.loads(completed.read_text(encoding='utf-8'))
         if (record['identity'] == identity and len(record['discs']) == 2
@@ -343,11 +369,20 @@ def prepare(args, runtime, data, log):
             atomic_json(data / 'prepared.json', record)
             progress(1, 'Already built')
             return
+    if record is None:
+        try:
+            record = json.loads((data / 'prepared.json').read_text(encoding='utf-8'))
+        except (FileNotFoundError, ValueError):
+            pass
+    # A runner or compiler update may require a new DLL. Extracted disc data
+    # can still be shared when the disc and extractor identities match.
+    cached_roots = reusable_disc_roots(data, record, identity)
     results = []
     for index, (iso, disc) in enumerate([(iso1, first), (iso2, second)]):
         progress(0.18 + index * 0.36, f'Extracting and compiling Disc {index + 1}')
         extracted, module = build_disc(iso, disc, build, runtime, env, cmake, compiler, log,
-                                       rel_layout=rel_layout, experimental_rel=args.experimental_rel)
+                                       rel_layout=rel_layout, experimental_rel=args.experimental_rel,
+                                       cached_extraction=cached_roots.get(index))
         results.append({'root': extracted.relative_to(data).as_posix(),
                         'dol': (extracted / 'sys/main.dol').relative_to(data).as_posix(),
                         'module': module.relative_to(data).as_posix(),

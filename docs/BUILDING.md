@@ -15,7 +15,7 @@ python app/twin_snakes.py
 
 The builder writes private disc-derived files under the chosen data directory. For a development checkout, use `--data .local/player`. Use `--runtime PATH` to select a staged open-source runtime; the default development location is `.local/runtime`.
 
-Setup verifies the extracted boot executable before reusing a disc directory. Running setup again replaces a missing or damaged executable from the verified disc image. The compiled native module is reused only if it matches the SHA-256 recorded at link completion. An older install with an empty completion record rebuilds once when setup is run again. Save files and settings live under the separate `user` directory.
+Setup can reuse extracted disc directories across runner updates when the normalized disc hashes and extractor hash match. It checks each cached boot executable and gameplay module before reuse. Running setup again re-extracts a missing or damaged disc cache from the verified image. The compiled native module is reused only if it matches the SHA-256 recorded at link completion. An older install with an empty completion record rebuilds once when setup is run again. Save files and settings live under the separate `user` directory.
 
 Play verifies both prepared boot executables and checks the native module against its recorded digest. When a check fails, the launcher keeps the previous setup record as `prepared.needs-repair.json`. In RecompLauncher, close the error and press Play again to reopen Easy Setup. Standalone players can reopen `TwinSnakes.exe` to select the disc images again.
 
