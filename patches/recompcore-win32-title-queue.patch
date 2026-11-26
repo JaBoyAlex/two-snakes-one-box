@@ -1,0 +1,61 @@
+diff --git a/Source/Core/DolphinNoGUI/PlatformWin32.cpp b/Source/Core/DolphinNoGUI/PlatformWin32.cpp
+--- a/Source/Core/DolphinNoGUI/PlatformWin32.cpp
++++ b/Source/Core/DolphinNoGUI/PlatformWin32.cpp
+@@ -20,6 +20,8 @@
+ #include <cstdio>
+ #include <ctime>
+ #include <filesystem>
++#include <mutex>
++#include <optional>
+ #include <string>
+ #include <vector>
+ #include <windows.h>
+@@ -41,6 +43,7 @@
+ constexpr UINT ID_CONTROLLER_PORT = 41005;
+ constexpr UINT ID_LOAD_STATE_FIRST = 41100;
+ constexpr UINT ID_LOAD_STATE_LAST = 41199;
++constexpr UINT WM_UPDATE_WINDOW_TITLE = WM_APP + 1;
+ 
+ // Hold-to-fast-forward target. 2x is fast enough to skip a cutscene without
+ // outrunning what most hosts can actually emulate.
+@@ -76,6 +79,8 @@
+   void ProcessEvents();
+ 
+   HWND m_hwnd{};
++  std::mutex m_title_mutex;
++  std::optional<std::wstring> m_pending_title;
+   DPI_AWARENESS_CONTEXT m_previous_dpi_context = nullptr;
+   HMENU m_menu{};
+   HMENU m_file_menu{};
+@@ -339,7 +344,12 @@
+ 
+ void PlatformWin32::SetTitle(const std::string& string)
+ {
+-  SetWindowTextW(m_hwnd, UTF8ToWString(string).c_str());
++  {
++    std::lock_guard lock(m_title_mutex);
++    m_pending_title = UTF8ToWString(string);
++  }
++  // The game and title threads can request an update after the window loop has stopped.
++  PostMessageW(m_hwnd, WM_UPDATE_WINDOW_TITLE, 0, 0);
+ }
+ 
+ void PlatformWin32::MainLoop()
+@@ -419,6 +429,17 @@
+   }
+   break;
+ 
++  case WM_UPDATE_WINDOW_TITLE:
++  {
++    std::optional<std::wstring> title;
++    {
++      std::lock_guard lock(platform->m_title_mutex);
++      title.swap(platform->m_pending_title);
++    }
++    if (title)
++      SetWindowTextW(hwnd, title->c_str());
++    return 0;
++  }
+   case WM_SIZE:
+   {
+     if (g_presenter)

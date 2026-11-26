@@ -571,6 +571,21 @@ The packaged runner restored a checkpoint from each launch and sampled 33 second
 | Liquid | Vulkan | 59.85 | 17.18 ms |
 | Escape Route | Direct3D 11 | 59.83 | 17.28 ms |
 
+### Dev.44 final-pursuit replays
+
+These windowed Disc 2 replays started from the same checkpoint after the second tunnel gate. They used 4× internal resolution, shared CPU and video threads, accurate framebuffer copies and a seeded shader cache.
+
+| Runner and renderer | Replay length | Median game speed | Samples below 95% | Longest vertical blank | Exit |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Dev.42 Direct3D 11 | 55 s | 100% | 17/220 | 61.52 ms | Normal |
+| Dev.42 Vulkan initial run | 55 s | 127.1% | 3/221 | 55.15 ms | Forced after stop timeout |
+| Dev.42 Vulkan order-reversed controls | 42 s each | 100% each | 9/338 | 61.61 ms | Both normal |
+| Dev.44 Vulkan title-queue candidate | 42 s each | 100% each | 2/338 | 65.54 ms | Both normal |
+
+The four order-reversed replays each included a gap of about 3.56 seconds between newly rendered frames while guest timing kept advancing. Windows process loopback captured 36 seconds of audible output in each replay with zero reported packet discontinuities or timestamp gaps above 2 ms. The longer Direct3D 11 and Vulkan replays recorded about 49 audible seconds each with the same loopback result.
+
+The initial Vulkan trace confirmed faster-than-normal guest progression for tens of seconds. The stop command was processed, but the runner did not exit. A separate Win32 fixture reproduced a title update blocking its caller when the window thread had stopped dispatching messages. Posting the update to the window thread resolved the fixture. The paired game replays did not reproduce either symptom, and the cause of the speed excursion remains open.
+
 ### Dev.35 Disc 1 boss replays
 
 Three isolated dev.34 launches loaded the Tank, Ninja and first Sniper Wolf fights from USA Very Easy practice saves. Each encounter responded to scripted analog input and preserved its memory-card save. [Practice-save source](https://www.speedrun.com/mgstts/resources)
