@@ -315,6 +315,22 @@ class PrepareTests(unittest.TestCase):
                 self.assertEqual((self.root / 'prepared.needs-repair.json').read_bytes(), original_record)
                 damaged.write_bytes(original)
 
+    def test_damaged_prepared_record_reopens_setup(self):
+        prepared = self.root / 'prepared.json'
+        repair = self.root / 'prepared.needs-repair.json'
+        args = SimpleNamespace(boot_disc=1)
+        for contents in (b'{"discs": [', b'\xff', b'null', b'{"discs":[]}', b'{"discs":[{}]}'):
+            with self.subTest(contents=contents):
+                prepared.write_bytes(contents)
+                self.assertIsNone(twin_snakes.read_prepared_record(prepared))
+                with patch.object(twin_snakes, 'run') as run:
+                    with self.assertRaisesRegex(twin_snakes.SetupError, 'Run setup again') as error:
+                        twin_snakes.play(args, self.root, self.root, None)
+                    self.assertEqual(error.exception.code, 27)
+                    run.assert_not_called()
+                self.assertFalse(prepared.exists())
+                self.assertEqual(repair.read_bytes(), contents)
+
 
 if __name__ == '__main__':
     unittest.main()

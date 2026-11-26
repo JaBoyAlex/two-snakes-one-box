@@ -43,6 +43,27 @@ def atomic_json(path, value):
     temporary.replace(path)
 
 
+def read_prepared_record(path):
+    try:
+        record = json.loads(path.read_text(encoding='utf-8'))
+    except (FileNotFoundError, ValueError):
+        return None
+    if not isinstance(record, dict) or not isinstance(record.get('identity', {}), dict):
+        return None
+    discs = record.get('discs')
+    if not isinstance(discs, list) or not 1 <= len(discs) <= 2:
+        return None
+    for disc in discs:
+        if not isinstance(disc, dict) or not all(
+                isinstance(disc.get(key), str) and disc[key] and '\0' not in disc[key]
+                for key in ('root', 'dol', 'module')):
+            return None
+        metadata = disc.get('metadata')
+        if not isinstance(metadata, dict) or not isinstance(metadata.get('dol_sha256'), str):
+            return None
+    return record
+
+
 def user_data_directory():
     if os.name == 'nt':
         return Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData/Local')) / 'TwinSnakesRecomp'
@@ -358,25 +379,18 @@ def prepare(args, runtime, data, log):
     key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:32]
     build = cache / 'builds' / key
     completed = build / 'prepared.json'
-    record = None
-    if completed.is_file():
-        record = json.loads(completed.read_text(encoding='utf-8'))
-        if (record['identity'] == identity and len(record['discs']) == 2
-                and all(extraction_ready(data / entry['root'], disc.dol_sha256, rel_layout)
-                        for entry, disc in zip(record['discs'], (first, second)))
-                and all(native_module_ready(module)
-                        for module in {data / entry['module'] for entry in record['discs']})):
-            atomic_json(data / 'prepared.json', record)
-            progress(1, 'Already built')
-            return
-    if record is None:
-        try:
-            record = json.loads((data / 'prepared.json').read_text(encoding='utf-8'))
-        except (FileNotFoundError, ValueError):
-            pass
+    selected = data / 'prepared.json'
+    record = read_prepared_record(completed)
+    if (record and record.get('identity') == identity and len(record['discs']) == 2
+            and all(extraction_ready(data / entry['root'], disc.dol_sha256, rel_layout)
+                    for entry, disc in zip(record['discs'], (first, second)))
+            and all(native_module_ready(module) for module in {data / entry['module'] for entry in record['discs']})):
+        atomic_json(selected, record)
+        progress(1, 'Already built')
+        return
     # A runner or compiler update may require a new DLL. Extracted disc data
     # can still be shared when the disc and extractor identities match.
-    cached_roots = reusable_disc_roots(data, record, identity)
+    cached_roots = reusable_disc_roots(data, record or read_prepared_record(selected), identity)
     results = []
     for index, (iso, disc) in enumerate([(iso1, first), (iso2, second)]):
         progress(0.18 + index * 0.36, f'Extracting and compiling Disc {index + 1}')
@@ -390,15 +404,23 @@ def prepare(args, runtime, data, log):
     record = {'identity': identity, 'discs': results}
     atomic_json(completed, record)
     # The previously working build remains selected until both discs succeed.
-    atomic_json(data / 'prepared.json', record)
+    atomic_json(selected, record)
     progress(1, 'Native modules built; gameplay compatibility still needs testing')
+
+
+def mark_setup_for_repair(prepared):
+    # RecompLauncher uses this marker to reopen Easy Setup on the next Play.
+    prepared.replace(prepared.with_name('prepared.needs-repair.json'))
+    raise SetupError('Cached Twin Snakes files are missing or damaged. Run setup again to repair them.', 27)
 
 
 def play(args, runtime, data, log):
     prepared = data / 'prepared.json'
     if not prepared.is_file():
         raise DiscError('Setup is required. Select both discs with --prepare first.')
-    record = json.loads(prepared.read_text(encoding='utf-8'))
+    record = read_prepared_record(prepared)
+    if record is None or args.boot_disc > len(record['discs']):
+        mark_setup_for_repair(prepared)
     discs = record['discs']
     entry = discs[args.boot_disc - 1]
     metadata = entry['metadata']
@@ -411,9 +433,7 @@ def play(args, runtime, data, log):
     modules_ready = args.allow_interpreter or all(native_module_ready(module, allow_legacy=True)
                                                   for module in {data / disc['module'] for disc in discs})
     if not (boot_files_ready and modules_ready):
-        # RecompLauncher uses this file to decide whether Play should reopen Easy Setup.
-        prepared.replace(data / 'prepared.needs-repair.json')
-        raise SetupError('Cached Twin Snakes files are missing or damaged. Run setup again to repair them.', 27)
+        mark_setup_for_repair(prepared)
     user = data / 'user'
     user.mkdir(exist_ok=True)
     config = user / 'config.ini'
