@@ -679,6 +679,10 @@ Eight more 24-second replays covered Heliport at 4× Direct3D 11 and the Raven f
 
 A separate trace sampled native execution bursts on entry and grouped the vector routines by guest return address. In the late flashback window, 1,540 of 1,623 sampled vector bursts came from three call sites in the gameplay module. The same sites accounted for 184 of 385 sampled vector bursts in Tower A. This identifies where to measure a narrower route if other gameplay replays expose regressions.
 
+A follow-up used the same packaged dev.41 executable for both vector settings. In the 57-second 4× Direct3D 11 flashback, the regular profile recorded 78 of 229 samples below 95%, with 96.9% median game speed. Enabling the vector profile reduced that to 22 of 229 and restored 100% median speed. Windows loopback reported zero packet discontinuities in both runs.
+
+The same executable ran two 64-second Tower A replays at 4× Vulkan. The regular profile recorded two of 257 samples below 95% with a 94.9% floor. The vector profile recorded three of 257 with an 89.6% floor. Both reached 100% median speed and reported zero Windows audio packet discontinuities. The deeper dip in this repeat supports leaving the vector route opt-in.
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.
