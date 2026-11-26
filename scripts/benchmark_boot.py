@@ -136,6 +136,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                     speed = float(state['speed'])
                     frame = int(state['frame_count'])
                     presents = int(state['present_count'])
+                    guest_ticks = int(state['guest_ticks']) if 'guest_ticks' in state else None
                     if windowed:
                         vps = float(state['vps'])
                         fps = float(state['fps'])
@@ -165,10 +166,13 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                         sample_start = now, frame, presents
                         interval_start = {name: log_size(path) for name, path in interval_logs.items()}
                     sample_end = now, frame, presents
-                    samples.append({'seconds_since_boot': round(now - booted_at, 2), 'speed': speed,
-                                    'frame_count': frame, 'present_count': presents})
+                    sample = {'seconds_since_boot': round(now - booted_at, 2), 'speed': speed,
+                              'frame_count': frame, 'present_count': presents}
+                    if guest_ticks is not None:
+                        sample['guest_ticks'] = guest_ticks
                     if windowed:
-                        samples[-1].update({'vps': vps, 'fps': fps})
+                        sample.update({'vps': vps, 'fps': fps})
+                    samples.append(sample)
                 if now - began_sampling >= seconds + 3:
                     interval_end = {name: log_size(path) for name, path in interval_logs.items()}
                     completed = True
@@ -200,6 +204,10 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
             'drawn_frames': summarize_counter_pauses(samples, 'frame_count'),
             'presents': summarize_counter_pauses(samples, 'present_count'),
         }
+        if 'guest_ticks' in samples[0] and 'guest_ticks' in samples[-1]:
+            summary['guest_tick_range'] = {
+                'start': samples[0]['guest_ticks'], 'end': samples[-1]['guest_ticks'],
+            }
     if load_state:
         summary['checkpoint_ready_seconds'] = round(began_sampling - start, 2) if began_sampling is not None else None
         if began_sampling is None:

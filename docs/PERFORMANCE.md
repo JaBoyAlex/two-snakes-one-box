@@ -653,6 +653,18 @@ Two narrower routes also reproduced the Tower A slowdown. Routing subtraction an
 
 The packaged dev.39 launcher repeated the 75-second, 4× Vulkan Tower A replay with the original route and the accurate framebuffer default. It reached 100% median and 94.1% minimum speed, with two of 300 samples below 95%. Windows loopback captured 69 seconds of audible output with zero packet discontinuities.
 
+### Hybrid CPU handoff in dev.39
+
+A 57-second Underground Passage flashback comparison used the same dev.39 executable, warm shaders, shared threads, 4× Direct3D 11 and accurate framebuffer copies. Both CPU modes held 100% median game speed. The hybrid mode recorded 46 of 229 samples below 95%, with a 67.1% floor and a maximum vertical blank interval of 44.23 ms. JIT-only recorded zero of 229 below 95%, a 99.6% floor and a 34.29 ms maximum. Each replay captured about 51 seconds of audible Cubeb output with zero reported packet discontinuities.
+
+A private runner checked the CPU-thread configuration notification flag before clearing it with an atomic exchange. This removes a locked write from the usual case where no configuration update is pending. Two more 57-second flashback runs per runner, with the order reversed, recorded 79 of 457 samples below 95% for the trial and 86 of 458 for dev.39. In Tower A the trial reached 83.1–83.3% median game speed and recorded 457 of 458 samples below 95%. Dev.39 held 100% median speed with 13 of 458 below 95%. All eight runs used 4× Direct3D 11 and reported zero Windows audio packet discontinuities. The candidate build was rejected. The comparison measures the regression in the trial binary and does not isolate its mechanism.
+
+### Guest-clock replay alignment
+
+The dev.40 diagnostic runner samples the emulated clock at video-field boundaries. The benchmark keeps those ticks alongside host time, newly drawn frames and presentation callbacks. Older runners still work with the benchmark.
+
+The packaged runner restored the same checkpoint in both CPU modes for 14-second offscreen Vulkan replays. The flashback shared 14.064 seconds of guest time across the two runs and rendered about 39 new frames per second. The Dock shared 14.047 seconds and rendered about 60. All four held 100% median game speed. The Dock hybrid run had two of 57 samples below 95%, while the other three runs had zero. The clock lets us compare the same part of a scene even when the two runners draw different numbers of frames.
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.
@@ -682,6 +694,8 @@ Our save-state slowdown reproduces with graphics and audio output disabled. The 
 | [Medal of Honor Frontline GameCube Recomp](https://github.com/ant0-blase/MOHFrontline-GC-RECOMP) | The runtime verifies loaded guest bytes before choosing native code for multiple executable images. Twin Snakes needs a related check for its relocatable module, whose addresses may differ by session. |
 | [GekkoAOT](https://github.com/ant0-blase/GekkoAOT) | An alternate runtime with direct RVZ input and REL discovery. Its v0.0.9 Windows tool found `main.dol` and `mgso.rel` on the USA Disc 1 RVZ and entered REL compilation. Gameplay compatibility is still unverified. |
 | [Twin Snakes Native Port](https://github.com/alphanu1/msg-twinsnakes-recomp) and its [Switch prototype](https://github.com/ramonDias07/MGSTTS-nx) | Public PAL analysis and runtime behavior are starting points for comparisons. Validate every code layout and timing assumption independently on the USA revision. |
+
+BlueWake measured CPU improvements from simplifying translated memory accesses and deadline checks. Its macOS tests compared the same blocks, memory and guest cycles as well as host runtime. Use those checks when assessing similar changes here. Wind Waker Recomp's higher simulation-rate prototype found timing differences in running and ladder movement even after adapting common actor updates. The Dock prototype will keep those updates on their original schedule while testing additional draws. [BlueWake CPU measurements](https://github.com/chrissotraidis/bluewake/blob/cced6493bd6fb0f0470f889f008bd0c064071dfc/docs/PERFORMANCE.md) [Wind Waker simulation tests](https://github.com/elliotttate/Wind-Waker-Recomp/blob/944a1f3c2b130a8086295428a0847938a777a2d7/docs/SIMULATION_60HZ.md)
 
 ### Main game module
 

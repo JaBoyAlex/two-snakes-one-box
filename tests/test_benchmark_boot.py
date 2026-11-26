@@ -69,9 +69,10 @@ class BenchmarkTests(unittest.TestCase):
                     nonlocal elapsed
                     elapsed += interval
                     frame = int(elapsed * 30) if advancing else 1
+                    clock = f'guest_ticks={5_000_000_000 + int(elapsed * 486_000_000)}\n' if advancing else ''
                     (work / 'control/status.txt').write_text(
                         f'booted=1\nstate=running\nspeed=1\nvps=60\nfps=30\n'
-                        f'frame_count={frame}\npresent_count={int(elapsed * 60)}\n')
+                        f'frame_count={frame}\npresent_count={int(elapsed * 60)}\n{clock}')
 
                 with (patch.object(benchmark_boot.subprocess, 'Popen') as launch,
                       patch.object(benchmark_boot.time, 'monotonic', side_effect=lambda: elapsed),
@@ -89,6 +90,11 @@ class BenchmarkTests(unittest.TestCase):
                 self.assertEqual(summary['completed'], advancing)
                 self.assertEqual(succeeded, advancing)
                 self.assertEqual('median_speed' in summary, advancing)
+                self.assertEqual('guest_ticks' in summary['samples'][0], advancing)
+                if advancing:
+                    self.assertEqual(summary['guest_tick_range'], {'start': 6_579_500_000, 'end': 7_065_500_000})
+                else:
+                    self.assertNotIn('guest_tick_range', summary)
 
     def test_ignores_fallback_ranges_in_inherited_environment(self):
         ranges = dict.fromkeys(('STATICRECOMP_FALLBACK_RANGES',

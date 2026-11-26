@@ -111,6 +111,7 @@ def main():
     apply_patch(source, 'moderngekko-automation-present-count.patch')
     apply_patch(source, 'moderngekko-automation-pad-fields.patch')
     apply_patch(source, 'moderngekko-twin-snakes-xfb-default.patch')
+    apply_patch(source, 'moderngekko-automation-guest-ticks.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-empty-gamepad-config.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-win32-focus-speed.patch')
