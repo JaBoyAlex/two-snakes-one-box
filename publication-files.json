@@ -56,6 +56,7 @@
   "patches/recompcore-savestate-load-result.patch",
   "patches/recompcore-savestate-fifo.patch",
   "patches/recompcore-trim-native-chunk-lookup.patch",
+  "patches/recompcore-twin-snakes-controller-port.patch",
   "patches/recompcore-twin-snakes-idle.patch",
   "patches/recompcore-windows-fst-rename-retry.patch",
   "patches/recompcore-verified-virtual-code.patch",

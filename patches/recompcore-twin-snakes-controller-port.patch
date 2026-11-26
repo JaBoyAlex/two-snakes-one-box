@@ -1,0 +1,197 @@
+diff --git a/Source/Core/Core/HW/SI/SI.h b/Source/Core/Core/HW/SI/SI.h
+--- a/Source/Core/Core/HW/SI/SI.h
++++ b/Source/Core/Core/HW/SI/SI.h
+@@ -63,6 +63,8 @@
+   void AddDevice(std::unique_ptr<ISIDevice> device);
+ 
+   void ChangeDevice(SIDevices device, int channel);
++  int ToggleTwinSnakesControllerPort();
++  int GetControllerInputIndex(int channel) const;
+ 
+   SIDevices GetDeviceType(int channel) const;
+ 
+@@ -236,6 +238,7 @@
+   // User-configured device type. possibly overridden by TAS/Netplay
+   std::array<std::atomic<SIDevices>, MAX_SI_CHANNELS> m_desired_device_types{};
+ 
++  int m_primary_controller_port = 0;
+   std::array<SSIChannel, MAX_SI_CHANNELS> m_channel;
+   USIPoll m_poll;
+   USIComCSR m_com_csr;
+diff --git a/Source/Core/Core/HW/SI/SI.cpp b/Source/Core/Core/HW/SI/SI.cpp
+--- a/Source/Core/Core/HW/SI/SI.cpp
++++ b/Source/Core/Core/HW/SI/SI.cpp
+@@ -20,7 +20,9 @@
+ #include "Common/Swap.h"
+ #include "Core/Config/MainSettings.h"
+ #include "Core/Config/ConfigManager.h"
++#include "Core/Core.h"
+ #include "Core/CoreTiming.h"
++#include "Core/HW/GCPad.h"
+ #include "Core/HW/MMIO.h"
+ #include "Core/HW/ProcessorInterface.h"
+ #include "Core/HW/SI/SI_DeviceGBA.h"
+@@ -261,6 +263,7 @@
+ void SerialInterfaceManager::Init()
+ {
+   RegisterEvents();
++  m_primary_controller_port = 0;
+ 
+   for (int i = 0; i < MAX_SI_CHANNELS; i++)
+   {
+@@ -505,6 +508,31 @@
+   m_desired_device_types[channel] = device;
+ }
+ 
++int SerialInterfaceManager::ToggleTwinSnakesControllerPort()
++{
++  if (Core::WantsDeterminism() || SConfig::GetInstance().GetGameID() != "GGSEA4")
++    return 0;
++
++  const int target = m_primary_controller_port == 0 ? 3 : 0;
++  if (m_desired_device_types[m_primary_controller_port] != SIDEVICE_GC_CONTROLLER ||
++      m_desired_device_types[target] != SIDEVICE_NONE)
++  {
++    return 0;
++  }
++
++  // Keep the same host mapping and hotplug behavior while moving the guest device.
++  Pad::ResetRumble(0);
++  ChangeDevice(SIDEVICE_NONE, m_primary_controller_port);
++  ChangeDevice(SIDEVICE_GC_CONTROLLER, target);
++  m_primary_controller_port = target;
++  return target + 1;
++}
++
++int SerialInterfaceManager::GetControllerInputIndex(int channel) const
++{
++  return channel == m_primary_controller_port ? 0 : channel;
++}
++
+ void SerialInterfaceManager::ChangeDeviceDeterministic(SIDevices device, int channel)
+ {
+   if (channel < 0 || channel >= MAX_SI_CHANNELS)
+diff --git a/Source/Core/Core/HW/SI/SI_DeviceGCController.cpp b/Source/Core/Core/HW/SI/SI_DeviceGCController.cpp
+--- a/Source/Core/Core/HW/SI/SI_DeviceGCController.cpp
++++ b/Source/Core/Core/HW/SI/SI_DeviceGCController.cpp
+@@ -146,7 +146,8 @@
+   // the remote controllers receive their status there as well
+   if (!NetPlay::IsNetPlayRunning())
+   {
+-    pad_status = Pad::GetStatus(m_device_number);
++    const int input = m_system.GetSerialInterface().GetControllerInputIndex(m_device_number);
++    pad_status = Pad::GetStatus(input);
+   }
+ 
+   HandleMoviePadStatus(m_system.GetMovie(), m_device_number, &pad_status);
+@@ -303,11 +304,10 @@
+ 
+     if (pad_num < 4)
+     {
+-      const SIDevices device = m_system.GetSerialInterface().GetDeviceType(pad_num);
+-      if (type == 1)
+-        CSIDevice_GCController::Rumble(pad_num, 1.0, device);
+-      else
+-        CSIDevice_GCController::Rumble(pad_num, 0.0, device);
++      const auto& si = m_system.GetSerialInterface();
++      const SIDevices device = si.GetDeviceType(pad_num);
++      const int input = si.GetControllerInputIndex(pad_num);
++      CSIDevice_GCController::Rumble(input, type == 1 ? 1.0 : 0.0, device);
+     }
+ 
+     if (poll == 0)
+diff --git a/Source/Core/DolphinNoGUI/PlatformWin32.cpp b/Source/Core/DolphinNoGUI/PlatformWin32.cpp
+--- a/Source/Core/DolphinNoGUI/PlatformWin32.cpp
++++ b/Source/Core/DolphinNoGUI/PlatformWin32.cpp
+@@ -6,6 +6,7 @@
+ #include "Core/Config/MainSettings.h"
+ #include "Core/Config/ConfigManager.h"
+ #include "Core/Core.h"
++#include "Core/HW/SI/SI.h"
+ #include "Core/SavestateLayout.h"
+ #include "Core/State.h"
+ #include "Core/System.h"
+@@ -16,6 +17,7 @@
+ 
+ #include <algorithm>
+ #include <chrono>
++#include <cstdio>
+ #include <ctime>
+ #include <filesystem>
+ #include <string>
+@@ -36,6 +38,7 @@
+ constexpr UINT ID_PAUSE = 41002;
+ constexpr UINT ID_MUTE = 41003;
+ constexpr UINT ID_FULLSCREEN = 41004;
++constexpr UINT ID_CONTROLLER_PORT = 41005;
+ constexpr UINT ID_LOAD_STATE_FIRST = 41100;
+ constexpr UINT ID_LOAD_STATE_LAST = 41199;
+ 
+@@ -65,6 +68,7 @@
+   bool CreateMenus();
+   void RefreshMenu(HMENU menu);
+   void SaveStateToStatesDirectory();
++  void ToggleControllerPort();
+   bool FitToMonitor(HMONITOR display);
+   void RestoreWindowed();
+   void ToggleFullscreen();
+@@ -146,6 +150,27 @@
+   return true;
+ }
+ 
++void PlatformWin32::ToggleControllerPort()
++{
++  auto& system = Core::System::GetInstance();
++  if (!Core::IsRunning(system))
++    return;
++
++  Core::RunOnCPUThread(system, [&system] {
++    if (!Core::IsRunning(system))
++      return;
++    const int port = system.GetSerialInterface().ToggleTwinSnakesControllerPort();
++    if (port == 0)
++    {
++      Core::DisplayMessage("Controller port switch unavailable", 2000);
++      return;
++    }
++
++    Core::DisplayMessage("Controller port " + std::to_string(port), 2000);
++    std::fprintf(stderr, "[input] Primary controller moved to port %d\n", port);
++  });
++}
++
+ bool PlatformWin32::CreateMenus()
+ {
+   m_menu = CreateMenu();
+@@ -161,6 +186,7 @@
+   // Checked state is refreshed from the core when the menu opens, so it cannot
+   // drift out of step with an emulation that was paused some other way.
+   AppendMenuW(m_file_menu, MF_STRING, ID_PAUSE, L"&Pause");
++  AppendMenuW(m_file_menu, MF_STRING, ID_CONTROLLER_PORT, L"&Controller Port 1 / 4\tF2");
+ 
+   AppendMenuW(m_view_menu, MF_STRING, ID_FULLSCREEN, L"&Fullscreen\tAlt+Enter");
+   AppendMenuW(m_view_menu, MF_STRING, ID_MUTE, L"&Mute Audio");
+@@ -422,6 +448,12 @@
+       platform->SaveStateToStatesDirectory();
+       return 0;
+     }
++    else if (wParam == VK_F2)
++    {
++      if ((static_cast<ULONG_PTR>(lParam) & (1u << 30)) == 0)
++        platform->ToggleControllerPort();
++      return 0;
++    }
+     else if (wParam == VK_SPACE)
+     {
+       Config::SetCurrent(Config::MAIN_EMULATION_SPEED, FAST_FORWARD_SPEED);
+@@ -486,6 +518,10 @@
+     {
+       Config::SetCurrent(Config::MAIN_AUDIO_MUTED, !Config::Get(Config::MAIN_AUDIO_MUTED));
+     }
++    else if (command == ID_CONTROLLER_PORT)
++    {
++      platform->ToggleControllerPort();
++    }
+     else if (command == ID_FULLSCREEN)
+     {
+       platform->ToggleFullscreen();

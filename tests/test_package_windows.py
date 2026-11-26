@@ -1,16 +1,43 @@
 import hashlib
+import os
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 from zipfile import ZipFile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from bootstrap import prepare_windows_tools
+import build_runtime
 from package_windows import check_package_tree
 
 
 class PackageWindowsTests(unittest.TestCase):
+    def test_runtime_patch_stack_can_be_reapplied(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            patch_dir = root / 'patches'
+            patch_dir.mkdir()
+            target = root / 'source.txt'
+            target.write_bytes(b'original\n')
+            for name, before, after in [('base', 'original', 'base'),
+                                        ('middle', 'base', 'middle'),
+                                        ('top', 'middle', 'top')]:
+                (patch_dir / name).write_bytes(
+                    f'diff --git a/source.txt b/source.txt\n--- a/source.txt\n+++ b/source.txt\n'
+                    f'@@ -1 +1 @@\n-{before}\n+{after}\n'.encode())
+
+            prerequisites = {'middle': ('base',), 'top': ('middle',)}
+            with (patch.dict(os.environ, {'GIT_CONFIG_COUNT': '0'}),
+                  patch.object(build_runtime, 'ROOT', root),
+                  patch.object(build_runtime, 'PATCH_PREREQUISITES', prerequisites)):
+                build_runtime.apply_patch(root, 'middle')
+                self.assertEqual(target.read_text(encoding='ascii'), 'middle\n')
+                build_runtime.apply_patch(root, 'top')
+                build_runtime.apply_patch(root, 'top')
+                self.assertEqual(target.read_text(encoding='ascii'), 'top\n')
+
     def test_prepares_pinned_archive_and_license_together(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

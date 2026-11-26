@@ -48,14 +48,25 @@ WINDOWS_INLINE_NOTICES = (
     'FreeSurround/source/FreeSurroundDecoder.cpp',
     'FreeSurround/source/KissFFT.cpp',
 )
+PATCH_PREREQUISITES = {
+    'moderngekko-skip-duplicate-game-inspection.patch': ('moderngekko-disc-pair.patch',),
+    'moderngekko-cache-asset-relative-paths.patch': ('moderngekko-windows-asset-hash.patch',),
+    'recompcore-gamepad-bindings.patch': ('recompcore-auto-gamepad.patch',),
+    'recompcore-win32-fullscreen.patch': ('recompcore-win32-window-teardown.patch',),
+    'recompcore-twin-snakes-controller-port.patch': ('recompcore-win32-fullscreen.patch',),
+    'recompcore-fixed-range-linking.patch': ('recompcore-fallback-linking.patch',),
+    'recompcore-fixed-dispatch-bounds.patch': ('recompcore-fixed-range-linking.patch',),
+    'recompcore-trim-native-chunk-lookup.patch': ('recompcore-verified-virtual-code.patch',),
+    'recompcore-cache-bat-translation.patch': ('recompcore-cache-instruction-hook.patch',),
+}
 
 
-def apply_patch(source, name, *, after=()):
+def apply_patch(source, name):
     patch = ROOT / 'patches' / name
     command = ['git', '-C', str(source), 'apply']
     if not subprocess.run([*command, '--reverse', '--check', str(patch)], capture_output=True).returncode:
         return
-    for prerequisite in after:
+    for prerequisite in PATCH_PREREQUISITES.get(name, ()):
         apply_patch(source, prerequisite)
     subprocess.run([*command, '--check', str(patch)], check=True)
     subprocess.run([*command, str(patch)], check=True)
@@ -88,31 +99,23 @@ def main():
             raise SystemExit(f'Source revision does not match dependencies.lock.json: {directory.name}')
     apply_patch(source, 'moderngekko-auto-gamepad.patch')
     apply_patch(source, 'moderngekko-no-empty-mod-hooks.patch')
-    apply_patch(source, 'moderngekko-skip-duplicate-game-inspection.patch',
-                after=('moderngekko-disc-pair.patch',))
+    apply_patch(source, 'moderngekko-skip-duplicate-game-inspection.patch')
     apply_patch(source, 'moderngekko-automatic-display.patch')
     apply_patch(source, 'moderngekko-direct3d11-settings.patch')
     apply_patch(source, 'moderngekko-title-game-speed.patch')
     apply_patch(source, 'moderngekko-windows-utf8-paths.patch')
     apply_patch(source, 'moderngekko-create-shader-cache.patch')
-    apply_patch(source, 'moderngekko-cache-asset-relative-paths.patch',
-                after=('moderngekko-windows-asset-hash.patch',))
+    apply_patch(source, 'moderngekko-cache-asset-relative-paths.patch')
     apply_patch(source, 'moderngekko-automation-load-result.patch')
     apply_patch(source, 'moderngekko-automation-present-count.patch')
-    apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch',
-                after=('recompcore-auto-gamepad.patch',))
+    apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-empty-gamepad-config.patch')
-    apply_patch(source / 'vendor/dolphin', 'recompcore-win32-fullscreen.patch',
-                after=('recompcore-win32-window-teardown.patch',))
+    apply_patch(source / 'vendor/dolphin', 'recompcore-twin-snakes-controller-port.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-fastmem.patch')
-    apply_patch(source / 'vendor/dolphin', 'recompcore-fixed-range-linking.patch',
-                after=('recompcore-fallback-linking.patch',))
     apply_patch(source / 'vendor/dolphin', 'recompcore-fixed-dispatch-bounds.patch')
-    apply_patch(source / 'vendor/dolphin', 'recompcore-trim-native-chunk-lookup.patch',
-                after=('recompcore-verified-virtual-code.patch',))
+    apply_patch(source / 'vendor/dolphin', 'recompcore-trim-native-chunk-lookup.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-cache-dispatch.patch')
-    apply_patch(source / 'vendor/dolphin', 'recompcore-cache-bat-translation.patch',
-                after=('recompcore-cache-instruction-hook.patch',))
+    apply_patch(source / 'vendor/dolphin', 'recompcore-cache-bat-translation.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-register-sync.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-x64-condition-register.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-headless-shader-progress.patch')
