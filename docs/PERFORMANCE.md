@@ -535,6 +535,8 @@ Three gameplay checkpoints also restored early and ran for 33 seconds at 4× in 
 
 Four 54-second flashback replays compared dev.31's normal hybrid path with the same runner in JIT-only mode, using shared threads and 4× Direct3D 11. The comparison reversed the run order. All four held 100% median game speed. The hybrid runs had eight of 432 samples below 95% and a longest vertical blank interval of 41.81 ms. JIT-only had zero of 434 and a longest interval of 34.02 ms. The residual dips tracked the hybrid path in this replay. The comparison did not isolate a specific native function or transition.
 
+A private dev.32 runtime trial moved the cycle-budget check ahead of the fast native dispatch lookup, so the final dispatch of a timing slice could skip that lookup. Both runners reached 100% median game speed in four order-reversed 54-second flashback replays. The reference had seven of 433 samples below 95% speed and the trial had seven of 434. Both had longest vertical blank gaps around 40–42 ms. The package uses the original dispatch ordering.
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.
