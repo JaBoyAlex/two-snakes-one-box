@@ -1,0 +1,194 @@
+diff --git a/tools/automation_protocol.hpp b/tools/automation_protocol.hpp
+--- a/tools/automation_protocol.hpp
++++ b/tools/automation_protocol.hpp
+@@ -15,6 +15,7 @@
+ {
+   Pad,
+   PadFrames,
++  PadFields,
+   ClearPad,
+   Pause,
+   Resume,
+@@ -42,7 +43,7 @@
+   std::filesystem::path path;
+   std::uint32_t address = 0;
+   std::uint32_t size = 0;
+-  std::uint32_t frames = 0;
++  std::uint32_t duration = 0;
+   std::vector<std::uint8_t> data;
+ };
+ 
+diff --git a/tools/automation_protocol.cpp b/tools/automation_protocol.cpp
+--- a/tools/automation_protocol.cpp
++++ b/tools/automation_protocol.cpp
+@@ -157,6 +157,8 @@
+     return CommandType::Pad;
+   if (text == "pad_frames")
+     return CommandType::PadFrames;
++  if (text == "pad_fields")
++    return CommandType::PadFields;
+   if (text == "clear_pad")
+     return CommandType::ClearPad;
+   if (text == "pause")
+@@ -226,7 +228,7 @@
+ }
+ 
+ bool ParsePadCommand(const std::map<std::string, std::string>& values, Command* command,
+-                     bool require_frames, std::string* error)
++                     const char* duration_key, std::string* error)
+ {
+   const auto port_it = values.find("port");
+   if (port_it == values.end())
+@@ -245,23 +247,23 @@
+ 
+   command->pad = {};
+   command->pad.port = *port;
+-  if (require_frames)
+-  {
+-    const auto frames_it = values.find("frames");
+-    const auto frames =
+-        frames_it == values.end() ? std::nullopt : ParseUnsigned(frames_it->second);
+-    if (!frames || *frames == 0 || *frames > 36000)
+-    {
+-      if (error)
+-        *error = "pad_frames commands require frames=1..36000";
+-      return false;
+-    }
+-    command->frames = *frames;
++  if (duration_key)
++  {
++    const auto duration_it = values.find(duration_key);
++    const auto duration =
++        duration_it == values.end() ? std::nullopt : ParseUnsigned(duration_it->second);
++    if (!duration || *duration == 0 || *duration > 36000)
++    {
++      if (error)
++        *error = std::string("pad_") + duration_key + " commands require " + duration_key + "=1..36000";
++      return false;
++    }
++    command->duration = *duration;
+   }
+ 
+   for (const auto& [key, value] : values)
+   {
+-    if (key == "command" || key == "port" || (require_frames && key == "frames"))
++    if (key == "command" || key == "port" || (duration_key && key == duration_key))
+       continue;
+     const PadField* field = FindPadField(key);
+     if (!field)
+@@ -453,11 +455,15 @@
+   switch (*type)
+   {
+   case CommandType::Pad:
+-    if (!ParsePadCommand(values, &parsed, false, error))
++    if (!ParsePadCommand(values, &parsed, nullptr, error))
+       return false;
+     break;
+   case CommandType::PadFrames:
+-    if (!ParsePadCommand(values, &parsed, true, error))
++    if (!ParsePadCommand(values, &parsed, "frames", error))
++      return false;
++    break;
++  case CommandType::PadFields:
++    if (!ParsePadCommand(values, &parsed, "fields", error))
+       return false;
+     break;
+   case CommandType::ClearPad:
+diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
+--- a/src/runtime/dolphin_runtime.cpp
++++ b/src/runtime/dolphin_runtime.cpp
+@@ -315,11 +315,44 @@
+           state.frame_count.load(std::memory_order_relaxed);
+       if (current_frame < first_frame)
+         first_frame = current_frame;
+-      else if (current_frame - first_frame >= command.frames)
++      else if (current_frame - first_frame >= command.duration)
+         break;
+       std::this_thread::sleep_for(std::chrono::milliseconds(1));
+     }
+     ClearAutomationPad(command.pad.port);
++    break;
++  }
++  case automation::CommandType::PadFields:
++  {
++    if (Core::GetState(system) != Core::State::Running)
++    {
++      return RuntimeError{RuntimeErrorCode::InvalidState,
++                          "pad_fields requires a running emulated core"};
++    }
++    std::atomic<bool> completed{false};
++    std::uint32_t elapsed_fields = 0;
++    auto field_hook = GetVideoEvents().vi_end_field_event.Register([&] {
++      if (completed.load(std::memory_order_relaxed))
++        return;
++      if (elapsed_fields == 0)
++        ApplyAutomationPad(command.pad);
++      if (elapsed_fields++ == command.duration)
++      {
++        ClearAutomationPad(command.pad.port);
++        completed.store(true, std::memory_order_relaxed);
++      }
++    });
++    while (!completed.load(std::memory_order_relaxed) && !stop_token.stop_requested() &&
++           Core::GetState(system) == Core::State::Running)
++    {
++      std::this_thread::sleep_for(std::chrono::milliseconds(1));
++    }
++    field_hook.reset();
++    if (!completed.load(std::memory_order_relaxed))
++    {
++      Core::RunOnCPUThread(system, [port = command.pad.port] { ClearAutomationPad(port); });
++      return RuntimeError{RuntimeErrorCode::InvalidState, "pad_fields was interrupted"};
++    }
+     break;
+   }
+   case automation::CommandType::ClearPad:
+@@ -391,6 +424,7 @@
+   case automation::CommandType::ReadMemory:
+   case automation::CommandType::WriteMemory:
+   case automation::CommandType::PadFrames:
++  case automation::CommandType::PadFields:
+   case automation::CommandType::ChangeDisc:
+     return true;
+   case automation::CommandType::Pad:
+diff --git a/tests/automation_protocol_test.cpp b/tests/automation_protocol_test.cpp
+--- a/tests/automation_protocol_test.cpp
++++ b/tests/automation_protocol_test.cpp
+@@ -163,7 +163,7 @@
+   error.clear();
+   if (!automation::ParseCommandFile(commands / "007_pad_frames.txt", &command, &error))
+     return 12;
+-  if (command.type != automation::CommandType::PadFrames || command.frames != 3 ||
++  if (command.type != automation::CommandType::PadFrames || command.duration != 3 ||
+       command.pad.port != 0 || command.pad.controls[15] != 1.0)
+   {
+     return 13;
+@@ -178,6 +178,28 @@
+       error.find("frames=1..36000") == std::string::npos)
+   {
+     return 14;
++  }
++
++  {
++    std::ofstream output(commands / "009_pad_fields.txt");
++    output << "command=pad_fields\nport=2\nfields=120\nmain_x=-0.5\n";
++  }
++  if (!automation::ParseCommandFile(commands / "009_pad_fields.txt", &command, &error) ||
++      command.type != automation::CommandType::PadFields || command.duration != 120 ||
++      command.pad.port != 2 || command.pad.controls[14] != -0.5)
++  {
++    return 15;
++  }
++
++  {
++    std::ofstream output(commands / "010_bad_pad_fields.txt");
++    output << "command=pad_fields\nport=0\nframes=3\na=1\n";
++  }
++  error.clear();
++  if (automation::ParseCommandFile(commands / "010_bad_pad_fields.txt", &command, &error) ||
++      error.find("fields=1..36000") == std::string::npos)
++  {
++    return 16;
+   }
+ 
+   std::error_code ec;

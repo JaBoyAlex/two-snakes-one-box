@@ -6,6 +6,7 @@
       "game_id": "GGSEA4",
       "revision": 0,
       "dol_sha256": "f81cbf0d6629af1fbc06ebd6fa5c0a30737a14472eb58a3ccf5b4bb895b4c5c2",
+      "jit_vector_math_ranges": ["80025ffc-8002603c", "800260dc-800260fc"],
       "jit_cache_loop_ranges": ["8001da20-8001da7c"],
       "rel": {
         "format": 1,

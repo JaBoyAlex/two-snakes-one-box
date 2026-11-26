@@ -25,6 +25,7 @@
   "patches/dolrecomp-windows-utf8-paths.patch",
   "patches/moderngekko-auto-gamepad.patch",
   "patches/moderngekko-automation-load-result.patch",
+  "patches/moderngekko-automation-pad-fields.patch",
   "patches/moderngekko-automation-present-count.patch",
   "patches/moderngekko-automatic-display.patch",
   "patches/moderngekko-cache-asset-relative-paths.patch",

@@ -2,7 +2,7 @@
 
 A work-in-progress native recompilation project for **Metal Gear Solid: The Twin Snakes** on GameCube, with local-disc setup and RecompLauncher integration.
 
-**Development status.** The Windows dev.37 package uses a locally compiled native boot module and JIT fallback for the main gameplay module. It includes the early save-state rendering fix, the faster fallback dispatcher, in-session controller port switching and a Windows focus-loss fix. Codec and Photo Album accuracy is on by default. The regular launcher uses shared CPU and video threads. RecompLauncher beta 68 prepared both discs through Easy Setup with an earlier portable build. A private update using the beta 68 installer preserved prepared data, settings and saves. A complete playthrough and a clean Windows account install remain release gates.
+**Development status.** The Windows dev.38 package uses a locally compiled native boot module and JIT fallback for the main gameplay module. It keeps three frequently used vector routines on the JIT to improve cutscene pacing. It includes the early save-state rendering fix, the faster fallback dispatcher, in-session controller port switching and a Windows focus-loss fix. Codec and Photo Album accuracy is on by default. The regular launcher uses shared CPU and video threads. RecompLauncher beta 68 prepared both discs through Easy Setup with an earlier portable build. A private update using the beta 68 installer preserved prepared data, settings and saves. A complete playthrough and a clean Windows account install remain release gates.
 
 The dev.21 Windows build adds Direct3D 11 under **Game Settings → Graphics backend**. Its first launch may spend time compiling shaders.
 

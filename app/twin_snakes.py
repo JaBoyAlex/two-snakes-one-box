@@ -398,9 +398,10 @@ def play(args, runtime, data, log):
     env.pop('MODERNGEKKO_ALTERNATE_DISC', None)
     env.pop('STATICRECOMP_PROFILE_FALLBACK_RANGES', None)
     if (profile and metadata['dol_sha256'] == profile['dol_sha256']
-            and args.experimental_cache_loops and not args.allow_interpreter
-            and 'rel' not in record.get('identity', {})):
-        jit_ranges = profile.get('jit_cache_loop_ranges')
+            and not args.allow_interpreter and 'rel' not in record.get('identity', {})):
+        jit_ranges = list(profile.get('jit_vector_math_ranges', ()))
+        if args.experimental_cache_loops:
+            jit_ranges.extend(profile.get('jit_cache_loop_ranges', ()))
         if jit_ranges:
             env['STATICRECOMP_PROFILE_FALLBACK_RANGES'] = ','.join(jit_ranges)
     if len(discs) == 2:

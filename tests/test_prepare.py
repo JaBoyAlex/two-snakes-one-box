@@ -185,7 +185,7 @@ class PrepareTests(unittest.TestCase):
             self.assertIn(f'progress 0.040 Checking {filename}', stdout.buffer.getvalue().decode('utf-8'))
             self.assertIn(f'Error: Cannot read {filename}', stderr.buffer.getvalue().decode('utf-8'))
 
-    def test_play_uses_profile_ranges_only_for_the_opted_in_verified_boot_module(self):
+    def test_play_uses_profile_ranges_only_for_the_verified_boot_module(self):
         self.write_extraction(self.root / 'disc1')
         (self.root / 'disc1.dll').write_bytes(b'linked output')
         (self.root / 'link.complete').touch()
@@ -193,8 +193,8 @@ class PrepareTests(unittest.TestCase):
                  'metadata': {'game_id': 'GGSEA4', 'revision': 0, 'dol_sha256': self.disc.dol_sha256}}
         key = 'STATICRECOMP_PROFILE_FALLBACK_RANGES'
         for identity, verified_hash, interpreter, opt_in, expected in (
-            ({}, self.disc.dol_sha256, False, True, '80000000-80000008'),
-            ({}, self.disc.dol_sha256, False, False, None),
+            ({}, self.disc.dol_sha256, False, True, '80000010-80000018,80000000-80000008'),
+            ({}, self.disc.dol_sha256, False, False, '80000010-80000018'),
             ({'rel': {}}, self.disc.dol_sha256, False, True, None),
             ({}, 'different', False, True, None),
             ({}, self.disc.dol_sha256, True, True, None),
@@ -203,6 +203,7 @@ class PrepareTests(unittest.TestCase):
                 twin_snakes.atomic_json(self.root / 'prepared.json',
                                         {'identity': identity, 'discs': [entry]})
                 profile = {'dol_sha256': verified_hash, 'rel': None,
+                           'jit_vector_math_ranges': ['80000010-80000018'],
                            'jit_cache_loop_ranges': ['80000000-80000008']}
                 args = SimpleNamespace(boot_disc=1, allow_interpreter=interpreter,
                                        experimental_cache_loops=opt_in, headless=True, automation_dir=None)

@@ -19,7 +19,7 @@ Setup verifies the extracted boot executable before reusing a disc directory. Ru
 
 Play verifies both prepared boot executables and checks the native module against its recorded digest. When a check fails, the launcher keeps the previous setup record as `prepared.needs-repair.json`. In RecompLauncher, close the error and press Play again to reopen Easy Setup. Standalone players can reopen `TwinSnakes.exe` to select the disc images again.
 
-Run `TwinSnakes.exe --experimental-cache-loops` to test JIT routing for two cache-maintenance routines in the verified USA boot profile. The diagnostic `STATICRECOMP_FALLBACK_RANGES` environment variable takes precedence, followed by a nonempty `StaticRecompFallbackRanges` runtime setting.
+The verified USA boot profile keeps three frequently used vector routines on the PowerPC JIT. Run `TwinSnakes.exe --experimental-cache-loops` to include the experimental cache-maintenance ranges. The diagnostic `STATICRECOMP_FALLBACK_RANGES` environment variable takes precedence, followed by a nonempty `StaticRecompFallbackRanges` runtime setting.
 
 To build the experimental native gameplay module, add `--experimental-rel` to `--prepare` after rebuilding the source runtime. Give the experiment its own `--data` directory. The builder links the verified REL from the selected discs and selects the new build after both discs are prepared. The regular launcher install uses the boot-only module while gameplay and timing tests are pending.
 
@@ -54,5 +54,7 @@ The launcher allows one visible game per user across package folders. Setup and 
 New Twin Snakes save states record the disc mounted at save time. Load a state with that disc mounted. For a local Disc 2 test, run `TwinSnakes.exe --boot-disc 2`. Older states lack disc metadata and require selecting the matching disc yourself. In-game memory-card saves still trigger the story’s automatic disc change.
 
 The runtime’s debug automation reports `load_state` as processed after the CPU completes the load. Wait for that result before measuring or sending dependent input. A rejected load appears in the failed command directory and `last_error`.
+
+For timing comparisons with a source-built runner, `command=pad_fields` holds controller input for the requested number of emulated video fields. Supply `port`, `fields` and any controls you want to hold. The hold starts at the next field boundary, and the command completes after the last field. `pad_frames` remains available for scripts timed to newly drawn frames.
 
 Dev.37 enables **Codec and Photo Album accuracy** by default for standalone and RecompLauncher profiles without a saved choice. If you previously turned it off, turn it back on under the launcher's advanced video settings and restart. For standalone profiles with an explicit override, the matching value is `XFBToTextureEnable = False` under `[Hacks]` in the data folder’s `user/Config/GFX.ini`. On dev.35 and earlier, the option is called **Photo Album capture**. Take a new photo after enabling the setting if a previous capture was incorrect.

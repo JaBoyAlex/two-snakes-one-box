@@ -632,6 +632,19 @@ A matched 62-second Direct3D 11 flashback comparison reproduced the cost of gues
 
 Three 60-second Direct3D 11 flashback replays on the tracing build kept accurate copies enabled. The shared-thread 4× run had 33 of 241 samples below 95%, with a minimum of 84.2%. Separate threads at 4× had 22 of 241, with a 91.1% minimum and a longest VBlank of 34.12 ms. Shared threads at 1× still had 30 of 241 samples below 95%. Each capture recorded about 54 seconds of audio with zero packet discontinuities. These results favor reducing CPU work during the heavy section.
 
+Four further 60-second replays used the dev.37 runner at 4× Direct3D 11 with shared threads and accurate copies. The comparison reversed the order of the original route and a candidate that keeps three frequently called vector routines on the PowerPC JIT. Both routes still dispatched native boot code and reached 100% median speed.
+
+| Route and order | Minimum game speed | Samples below 95% | Maximum vertical blank |
+| --- | ---: | ---: | ---: |
+| Original first | 85.6% | 36 / 240 | 44.10 ms |
+| Vector JIT second | 92.2% | 5 / 241 | 44.11 ms |
+| Vector JIT first | 94.2% | 1 / 241 | 49.16 ms |
+| Original second | 83.5% | 35 / 241 | 46.73 ms |
+
+All four runs logged zero Windows audio packet discontinuities. The vector route reduced the number of slow samples from 71 to six, while isolated VBlank gaps still varied. A separate headless comparison matched 55.994 seconds of guest DSP audio sample for sample.
+
+The normal dev.38 launcher repeated the 4× Direct3D 11 flashback with the accurate setting supplied by default. The 60-second measurement reached 100% median and 91.3% minimum speed, with five of 240 samples below 95%. Windows loopback recorded 54 seconds of audible output with zero packet discontinuities.
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.
@@ -719,6 +732,8 @@ PowerPC instruction fingerprints identified the matching SDK routines in the USA
 The same engine viewport call site tracked the display-copy cadence in both scenes. Four perspective upload sites also followed roughly 30 Hz in dialogue and 60 Hz at the Dock. In a follow-up trace, one overlay call site built a view matrix into the same destination in both scenes. For that destination, the median interval was 33.369 ms across 372 calls in dialogue and 16.679 ms across 740 calls at the Dock. In dialogue the same call site also built matrices into a second destination twice per update. The USA matrix routine matches the PAL `C_MTXLookAt` symbol position relative to neighboring SDK functions and calls the expected vector normalization and cross-product helpers. Animation and camera-input update rates still need separate traces. [PAL SDK symbol reference](https://github.com/alphanu1/msg-twinsnakes-recomp/blob/d1fbfec2281042d2eaef43dbb20afedb0ae1d364/config/symbols/main.dol.symbols.txt) [libogc view-matrix API](https://github.com/devkitPro/libogc/blob/master/gc/ogc/gu.h)
 
 A separate trace grouped SDK calls between guest framebuffer copies. Across 512 Dock intervals near 60 Hz, the median interval contained 77 position-matrix uploads, 11 normal-matrix uploads, 38 projections and four look-at calls. The Dock trace found ten position-matrix call sites. In the Underground Passage flashback, the typical draw uploaded 19 position and three normal matrices in both the 30 and 60 Hz parts. This measures what each draw consumes. Identifying which camera and model inputs can be evaluated for an extra draw is the next step.
+
+The source-built diagnostic runner can hold scripted input by emulated video fields. In the opening movie, a 120-field hold completed in 2.10 seconds and the draw counter advanced by 62. The Dock control completed in 2.18 seconds and advanced by 120 draws. The elapsed time includes polling for the completion result. Both commands were also tested against a paused core and returned an error. This lets future comparisons vary the render cadence while keeping the input hold length on the original video clock.
 
 Prototype rendering directly from camera and animation evaluated at the presentation cadence, where the game's data supports it. Start with a known gameplay replay and an in-engine dialogue scene. Keep the original physics and script update schedule and audio clock, and verify motion, camera cuts, and dialogue timing with repeatable input. A higher simulation rate would require validating each frame-dependent update and callback. Keep the original guest speed limit during these experiments.
 
