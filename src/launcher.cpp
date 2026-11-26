@@ -34,7 +34,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     int count = 0;
     auto arguments = CommandLineToArgvW(GetCommandLineW(), &count);
     if (!arguments) return 21;
-    std::wstring command = Quote(python.wstring()) + L" " + Quote(script.wstring());
+    std::wstring command = Quote(python.wstring()) + L" -B " + Quote(script.wstring());
     for (int index = 1; index < count; ++index) command += L" " + Quote(arguments[index]);
     if (count == 1) command += L" --gui";
     LocalFree(arguments);

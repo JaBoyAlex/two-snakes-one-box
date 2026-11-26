@@ -531,11 +531,19 @@ Dev.30 restored the flashback at the first observed present with separate CPU an
 
 An order-reversed comparison then ran the same early restore for 60 seconds per leg at 4× on Direct3D 11 with the normal hybrid module. All four legs reached 100% median game speed and approximately 36.6–36.8 newly drawn frames per second. Windows process loopback collected approximately 54 seconds of audible Cubeb output per leg, with zero packet discontinuities and zero valid timestamp gaps above 2 ms. The shared runs had seven of 482 samples below 95% speed and the separate runs had zero of 482. Separate threads reduced the longest vertical blank gap from 43.46 to 35.09 ms and the total number of rendered-frame intervals above 50 ms from 371 to 245. Both modes still had a longest rendered-frame interval around 84 ms. Other gameplay and renderer checkpoints still need comparison before a default change.
 
+Three gameplay checkpoints also restored early and ran for 33 seconds at 4× in each thread mode. Tower A and the Heliport used Direct3D 11. The Raven fight used Vulkan. All six replays reached 100% median game speed with zero of 798 samples below 95%. Windows loopback captured 27 seconds per replay with zero packet discontinuities or valid timestamp gaps above 2 ms. The longest rendered-frame interval in Tower A fell from 39.94 to 33.58 ms with separate threads. The Raven and Heliport maxima stayed below 24 and 19 ms respectively. Shared threads remain the default pending playthrough validation.
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.
 
 Two 56-second flashback replays per target at 4× Direct3D 11 held 100% median game speed. The generic build had two of 450 samples below 95% speed and the x86-64-v3 build had seven. The windowed flashback evidence favors keeping the generic build.
+
+### Native module build time
+
+A clean build of the same generated boot module on the bundled x64 toolchain took 114.17 seconds with ThinLTO and 83.64 seconds without IPO. Linking took 44.93 and 0.13 seconds respectively. The two DLLs measured 9.26 and 9.23 MiB. The comparison covers the native module build after disc extraction and translation.
+
+Four order-reversed 54-second flashback replays at 4× Direct3D 11 reached 100% median game speed. ThinLTO recorded 27 of 434 samples below 95% speed and the no-IPO build recorded 40 of 434. Individual repeats varied. Four 25-second Tower A replays under the same settings also reached 100% median game speed, with zero of 404 samples below 95%. The setup build retains ThinLTO while gameplay pacing takes priority over the measured one-time build savings.
 
 ## Tool comparisons
 

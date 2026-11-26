@@ -89,6 +89,9 @@ def main():
     for name in ['cmake', 'ninja', 'llvm-mingw']:
         shutil.copytree(args.tools / name, stage / 'tools' / name, ignore=omit_unused_directories)
     (stage / 'portable.txt').touch()
+    # Run the entry points before recording the files in the assembled package.
+    subprocess.run([str(stage / 'TwinSnakes.exe'), '--help'], check=True)
+    subprocess.run([str(stage / 'runtime/moderngekko-run.exe'), '--help'], check=True)
     check_package_tree(stage)
     manifest = {}
     for path in sorted(stage.rglob('*')):
@@ -96,10 +99,6 @@ def main():
             with path.open('rb') as stream:
                 manifest[path.relative_to(stage).as_posix()] = hashlib.file_digest(stream, 'sha256').hexdigest()
     (stage / 'package-files.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
-    # Verify the same executable named by prepare and start can find its Python
-    # runtime and entry point; this does not constitute a gameplay check.
-    subprocess.run([str(stage / 'TwinSnakes.exe'), '--help'], check=True)
-    subprocess.run([str(stage / 'runtime/moderngekko-run.exe'), '--help'], check=True)
     if args.stage_only:
         print(f'Local RecompLauncher build folder: {stage}')
         return
