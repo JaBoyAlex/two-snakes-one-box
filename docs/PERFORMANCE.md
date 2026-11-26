@@ -46,6 +46,8 @@ Use `--compare-threading` to run shared and separate CPU/video threads in both o
 
 Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay. Benchmark profiles and logs default to a subdirectory of the system temporary directory. Use `--output PATH` to retain traces elsewhere. One run in a synced workspace failed to replace the test profile's filesystem metadata (`IOS_FS: Failed to rename temporary FST file`). Repeat runs with isolated profiles outside the synced workspace completed successfully.
 
+The benchmark requires advancing present callbacks to report speed or frame-rate statistics. A stalled restore retains its raw status samples and reports `presentation_advanced: false` without displaying the last sampled timing values as active playback.
+
 For an order-reversed graphics comparison, pair `--windowed Vulkan` with `--compare-backend D3D`. Use `--offscreen Vulkan` for a headless rendering comparison with audio output disabled. Each leg starts from its own profile. To compare warm runs, pass a `--shader-cache-seed` containing cache files for both backends.
 
 A later Windows test reproduced that warning by holding the existing `fst.bin` without delete sharing. A source handle returned error 32 during an atomic replacement. A destination handle returned error 5. The runtime retries those two errors when committing IOS metadata. Releasing the destination lock after 22 ms let the game boot and shut down normally. Native controls held both kinds of lock through the retry sequence and verified that the existing and temporary files survived. [Windows file sharing](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew)
@@ -504,6 +506,22 @@ The dev.29 candidate also completed two 81-second windowed 4× replays with Cube
 Thirty of the 31 flashback speed dips fell in the same ten-second portion of the replay. The flashback includes a sequence at roughly 30 rendered frames per second and later gameplay. Game-speed and vertical-blank measurements show the host pacing separately from how often the scene produces a different frame.
 
 Four further 81-second Direct3D 11 replays at 4× compared dev.28 with the dev.29 range profile in both run orders. Dev.28 had 3 and 7 samples below 95% speed. The range profile had 18 and 30. All four held 100% median game speed, and all speed dips occurred in the same portion of the restored scene. The range profile is opt-in through `--experimental-cache-loops` while the flashback regression is investigated.
+
+### Flashback CPU load
+
+Five 56-second diagnostic replays restored the same flashback checkpoint. Windows thread CPU time was measured within the matched guest-frame interval containing the dips. All runs used shared CPU and video threads on the i5-11400 and reached 100% median game speed.
+
+| Build and settings | Shared thread CPU time as a share of wall time | Samples below 95% in the affected interval |
+| --- | ---: | ---: |
+| Dev.28, Direct3D 11 at 4× | 97.9% of wall time | 2 / 44 |
+| Dev.29 range profile, Direct3D 11 at 4× | 98.3% | 22 / 44 |
+| Private dispatch trial with the range profile, Direct3D 11 at 4× | 99.0% | 9 / 43 |
+| Dev.29 range profile, Direct3D 11 at 1× | 98.4% | 8 / 43 |
+| Dev.29 range profile, Vulkan at 4× | 97.8% | 9 / 43 |
+
+A separate dev.28 MSVC map run sampled the host instruction pointer for 11 seconds starting 40 seconds after the checkpoint loaded. Of 698 snapshots, 280 landed in the native game module and 278 in the runner. The runner samples included 44 in register synchronization and 42 in the native run loop, chunk lookup and dispatch checks. These are snapshots of the busiest thread, including waits.
+
+Two early flashback restores with separate threads acknowledged the state and then produced zero new present callbacks over 56 seconds. The same early stall reproduced in a short Direct3D 11 JIT-only run and in a Vulkan hybrid run. Separate-thread Direct3D 11 booted and advanced normally without a restore. A short Direct3D 11 run that waited for 240 present callbacks before requesting the restore advanced for its full 14-second sample. The two shared-thread comparisons both advanced and completed the full replay.
 
 ### Modern x64 compiler target
 
