@@ -209,9 +209,9 @@
       "group": "Video",
       "in": "graphics",
       "advanced": true,
-      "help": "Enable this to restore the Codec backdrop and capture pictures correctly. Restart the game after changing it.",
+      "help": "Uses framebuffer copies to guest memory for the Codec backdrop and Photo Album. Restart the game after changing it.",
       "defaults": {
-        "Hacks/XFBToTextureEnable": "True"
+        "Hacks/XFBToTextureEnable": "False"
       },
       "choices": [
         {

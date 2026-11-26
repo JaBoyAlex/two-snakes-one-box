@@ -34,6 +34,7 @@
   "patches/moderngekko-no-empty-mod-hooks.patch",
   "patches/moderngekko-skip-duplicate-game-inspection.patch",
   "patches/moderngekko-title-game-speed.patch",
+  "patches/moderngekko-twin-snakes-xfb-default.patch",
   "patches/moderngekko-windows-asset-hash.patch",
   "patches/moderngekko-windows-utf8-paths.patch",
   "patches/recompcore-auto-gamepad.patch",

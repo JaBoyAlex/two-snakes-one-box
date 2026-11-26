@@ -603,6 +603,17 @@ Two traced 52-second Tower A replays at 4× Direct3D 11 used the same warm-cache
 
 The packaged dev.36 runner repeated the check over 46 seconds. After switching away and back, including with Alt-Tab, the longest render interval was 38.3 ms. The replay held 100% median game speed with zero of 185 samples below 95% and zero packet discontinuities in 40 seconds of audible Windows loopback.
 
+### Codec framebuffer copies
+
+Four 24-second dev.36 Tower A replays compared texture-only XFB copies with copies to guest memory at 4×, using shared threads and a warm shader cache on each backend. All four runs held 100% median game speed, with zero of 388 samples below 95%. Each Windows audio capture reported zero packet discontinuities.
+
+| Backend | Longest render interval, texture only / guest memory | Longest vertical blank, texture only / guest memory |
+| --- | ---: | ---: |
+| Direct3D 11 | 38.75 / 36.82 ms | 25.82 / 24.22 ms |
+| Vulkan | 35.12 / 36.99 ms | 24.97 / 24.74 ms |
+
+The comparison covers one checkpoint and one GPU. Dev.37 defaults to copying XFB data to guest memory for the Codec backdrop and Photo Album.
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.
