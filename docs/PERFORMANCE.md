@@ -647,6 +647,12 @@ The private dev.38 candidate enabled the vector route by default. Its normal lau
 
 The same packaged executable replayed Tower A at 4× Vulkan for 75 seconds in three isolated profiles. With the vector route active, the two runs dipped below 95% in 124 and 116 of 300 samples and held 95.6% and 95.9% median speed. The diagnostic override disabling the route reduced dips to 12 of 300 samples and restored 100% median speed. All three captures reported zero Windows audio packet discontinuities. The regular launcher keeps the original route. Use the experimental switch for further vector tests.
 
+Four headless Tower A runs compared CPU time over the same 1,308 drawn frames per run. Routing all three routines increased the shared emulation thread's CPU time from 16.031 to 16.195 ms per frame in one order and from 15.780 to 16.058 ms in the other. This comparison removes display output and shows a smaller cost than the windowed slowdown.
+
+Two narrower routes also reproduced the Tower A slowdown. Routing subtraction and scaling recorded 71 of 257 slow samples in the 64-second Tower A replay and 48 of 241 in the 60-second flashback. Routing the dot product alone recorded 75 of 257 in Tower A and 36 of 241 in the flashback. Each capture reported zero Windows audio packet discontinuities. Neither narrower route retained the flashback gain in these tests.
+
+The packaged dev.39 launcher repeated the 75-second, 4× Vulkan Tower A replay with the original route and the accurate framebuffer default. It reached 100% median and 94.1% minimum speed, with two of 300 samples below 95%. Windows loopback captured 69 seconds of audible output with zero packet discontinuities.
+
 ### Modern x64 compiler target
 
 Clang rebuilt the same native boot module for `x86-64-v3`. In order-reversed, matched-frame comparisons, Tower A's CPU cost fell from 14.913 to 14.838 ms/frame and from 15.554 to 14.727 ms/frame. Heliport fell from 12.132 to 11.714 ms/frame and from 11.903 to 11.711 ms/frame. All eight runs held 100% median game speed. The generic x64 target stays in the regular package. The measured savings vary by scene and this target raises the module's host CPU requirements.
