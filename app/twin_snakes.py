@@ -399,7 +399,9 @@ def play(args, runtime, data, log):
     env.pop('STATICRECOMP_PROFILE_FALLBACK_RANGES', None)
     if (profile and metadata['dol_sha256'] == profile['dol_sha256']
             and not args.allow_interpreter and 'rel' not in record.get('identity', {})):
-        jit_ranges = list(profile.get('jit_vector_math_ranges', ()))
+        jit_ranges = []
+        if args.experimental_vector_routing:
+            jit_ranges.extend(profile.get('jit_vector_math_ranges', ()))
         if args.experimental_cache_loops:
             jit_ranges.extend(profile.get('jit_cache_loop_ranges', ()))
         if jit_ranges:
@@ -426,6 +428,8 @@ def main():
                         help='Compile the gameplay module along with the boot executable')
     parser.add_argument('--experimental-cache-loops', action='store_true',
                         help='Test JIT routing for the verified boot module cache loops when playing')
+    parser.add_argument('--experimental-vector-routing', action='store_true',
+                        help='Test JIT routing for the verified boot module vector routines when playing')
     parser.add_argument('--inspect', action='store_true')
     parser.add_argument('--disc1', type=Path)
     parser.add_argument('--disc2', type=Path)

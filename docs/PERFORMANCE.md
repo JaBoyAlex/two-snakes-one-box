@@ -643,7 +643,9 @@ Four further 60-second replays used the dev.37 runner at 4× Direct3D 11 with sh
 
 All four runs logged zero Windows audio packet discontinuities. The vector route reduced the number of slow samples from 71 to six, while isolated VBlank gaps still varied. A separate headless comparison matched 55.994 seconds of guest DSP audio sample for sample.
 
-The normal dev.38 launcher repeated the 4× Direct3D 11 flashback with the accurate setting supplied by default. The 60-second measurement reached 100% median and 91.3% minimum speed, with five of 240 samples below 95%. Windows loopback recorded 54 seconds of audible output with zero packet discontinuities.
+The private dev.38 candidate enabled the vector route by default. Its normal launcher repeated the 4× Direct3D 11 flashback with accurate framebuffer copies. The 60-second measurement reached 100% median and 91.3% minimum speed, with five of 240 samples below 95%. Windows loopback recorded 54 seconds of audible output with zero packet discontinuities.
+
+The same packaged executable replayed Tower A at 4× Vulkan for 75 seconds in three isolated profiles. With the vector route active, the two runs dipped below 95% in 124 and 116 of 300 samples and held 95.6% and 95.9% median speed. The diagnostic override disabling the route reduced dips to 12 of 300 samples and restored 100% median speed. All three captures reported zero Windows audio packet discontinuities. The regular launcher keeps the original route. Use the experimental switch for further vector tests.
 
 ### Modern x64 compiler target
 
