@@ -663,6 +663,18 @@ Four Null replays with per-field compilation timing recorded the same 8,950 anal
 
 A separate pair of Null replays matched 21.355 seconds of guest DSP audio sample for sample.
 
+#### First-use compilation in the pursuit
+
+A private dev.49 trace recorded each compiled block's effective address, physical address and CPU feature flags, together with cache clears, block removal and video updates. The 39-second Null replays used the same checkpoint in JIT-only and hybrid modes. At the recurring hitch, one video-update interval contained 1,412 compilations in JIT-only mode and 1,367 in hybrid mode. Every entry address was first seen in that process. The hybrid burst was entirely in the gameplay REL. Neither interval included a cache clear or block removal. Both replays exited normally.
+
+A private module combined the dev.49 boot code with 71 verified native chunks from the gameplay REL, selected from the burst trace. In two order-reversed pairs of 39-second Null replays, the selected chunks reduced the number of JIT compilations around the hitch from 1,501 to three. The runner dispatched native REL code 67–70 million times across each candidate replay. Guest-clock progression over the complete interval fell from 96.3–98.9% on the reference to 80.5–83.0% on the candidate. All four replays exited normally. The selected native REL chunks stay experimental because their execution cost outweighed the compilation savings.
+
+Two order-reversed pairs of 37-second Null replays tested the JIT's existing branch-following switch. With it disabled, the recurring video-update interval fell from 44.45–46.10 ms to 29.97–29.98 ms. The code generator emitted 1,707 shorter blocks there, covering 15,681 instructions, versus 1,367 blocks covering 34,044 instructions with branch following enabled. Whole-replay progression fell from 98.8–99.4% to 95.3–95.4%, and samples below 95% rose from 16 of 298 to 100 of 297. All four runs exited normally. Branch following remains enabled in the regular runner.
+
+A private trial kept branch following for the first 256 compiled blocks per video-update interval and skipped it for subsequent compilations in that interval. In two order-reversed pairs of 37-second Null replays, the compilation-heavy interval shortened from 39.57–46.88 ms to 27.64–27.89 ms. The trial recorded 29 of 298 samples below 95% game speed and sustained 98.5–99.0% of real time. Its control recorded three of 297 below 95% and sustained 99.5–100.1%. All four runs exited normally.
+
+Four 38-second replays repeated this trial at 4× Vulkan with accurate framebuffer copies and Cubeb audio at 5% test volume on the secondary display. The compilation-heavy interval fell from 38.12–44.43 ms to 27.89–27.93 ms. Over 37.371 matched guest seconds, the limit increased CPU time from 671–687 to 804–807 ms per emulated second. Samples below 95% rose from nine to 47 out of 306 per path. The longest video-update intervals were 54.10–54.24 ms in the control and 55.68–62.67 ms with the limit. Each Windows audio capture reported zero packet discontinuities and all runs exited normally. The compilation limit stays private because it worsened pacing across the scene.
+
 ### Dev.35 Disc 1 boss replays
 
 Three isolated dev.34 launches loaded the Tank, Ninja and first Sniper Wolf fights from USA Very Easy practice saves. Each encounter responded to scripted analog input and preserved its memory-card save. [Practice-save source](https://www.speedrun.com/mgstts/resources)
