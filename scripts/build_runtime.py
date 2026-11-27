@@ -124,6 +124,7 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-fastmem.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fixed-dispatch-bounds.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fixed-fallback-lookup.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-jit-analysis-ranges.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-cache-dispatch.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-cache-bat-translation.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-register-sync.patch')

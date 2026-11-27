@@ -1,0 +1,41 @@
+diff --git a/Source/Core/Core/PowerPC/PPCAnalyst.cpp b/Source/Core/Core/PowerPC/PPCAnalyst.cpp
+--- a/Source/Core/Core/PowerPC/PPCAnalyst.cpp
++++ b/Source/Core/Core/PowerPC/PPCAnalyst.cpp
+@@ -659,6 +659,8 @@
+   size_t caller = 0;
+   u32 numFollows = 0;
+   u32 num_inst = 0;
++  u32 physical_range_start = 0;
++  u32 physical_range_end = 0;
+ 
+   const bool enable_follow = m_enable_branch_following;
+ 
+@@ -684,8 +686,18 @@
+     code[i].inst = inst;
+     code[i].skip = false;
+     block->m_stats->numCycles += opinfo->num_cycles;
+-    block->m_physical_addresses.insert(result.physical_address,
+-                                       result.physical_address + sizeof(UGeckoInstruction));
++    // Submit contiguous physical spans together. Branches and page mappings
++    // can make adjacent decoded instructions discontinuous in physical memory.
++    const u32 next_physical = result.physical_address + sizeof(UGeckoInstruction);
++    if (next_physical > result.physical_address)
++    {
++      if (result.physical_address != physical_range_end)
++      {
++        block->m_physical_addresses.insert(physical_range_start, physical_range_end);
++        physical_range_start = result.physical_address;
++      }
++      physical_range_end = next_physical;
++    }
+ 
+     SetInstructionStats(block, &code[i], opinfo);
+ 
+@@ -802,6 +814,7 @@
+     }
+   }
+ 
++  block->m_physical_addresses.insert(physical_range_start, physical_range_end);
+   block->m_num_instructions = num_inst;
+ 
+   if (block->m_num_instructions > 1)

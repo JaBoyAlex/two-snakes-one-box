@@ -651,6 +651,18 @@ The same two modules ran two 17-second Null replays each in Heliport and Tower A
 | Heliport | 871–895 ms | 858–867 ms | 99.5–100.7% / 99.8–100.9% |
 | Tower A | 1,069–1,128 ms | 1,040–1,052 ms | 85.7–89.8% / 93.2–94.9% |
 
+#### Dev.48 pursuit hitch attribution
+
+Four private 35-second 4× Vulkan replays used the dev.48 module, accurate framebuffer copies and the same warm shader cache. Shared CPU and video threads advanced at 96.9–98.7% of real time. Separate threads advanced at 94.5–97.9%. A gap of 69–82 ms appeared about 27 seconds after load in every run. The thread that counts video updates reported 62.5–78.1 ms of CPU time in those gaps, and the Vulkan probes recorded no overlapping waits longer than 5 ms. Each Windows audio capture reported zero discontinuities and all runs exited normally.
+
+A second private build accumulated time spent emitting JIT blocks, processing FIFO commands, finding XFB textures, and verifying native ranges between video updates. One JIT-only gap lasted 55.38 ms, including 38.60 ms emitting 1,412 blocks. A similar hybrid gap lasted 83.84 ms, including 40.91 ms emitting 1,367 blocks. The hybrid trace also captured a 95.43 ms gap with just 0.14 ms in block emission. There is a repeatable compilation spike, and other gaps still need attribution. The second probe takes a clock reading around every FIFO call, so use these timings to locate work in the gaps and use the first trace for pacing comparisons.
+
+The PowerPC analyzer now inserts contiguous physical instruction spans together when building the JIT cache's invalidation map. The resulting range unions matched the original insert-per-instruction path across 100,002 sequences with 6,347,258 addresses, including address wrap, gaps, and reverse branches. In four order-reversed 34-second windowed Vulkan replays, the candidate used 894–901 ms of thread CPU time per emulated second over the same 28.946 guest seconds. The reference used 907–918 ms. Worst video-update gaps were 69.90–89.55 ms with the change and 75.19–77.83 ms in the reference. All replays kept the original throttle limit, exited normally, and recorded no Windows audio packet discontinuities.
+
+Four Null replays with per-field compilation timing recorded the same 8,950 analyzed blocks in compilation-heavy fields on each run. Mean analysis time was 2.79–3.72 µs per block with the coalesced spans and 2.72–3.88 µs with individual inserts. The largest pursuit compilation burst still emitted 1,367 blocks in both versions. The trial removes repeated range-map operations while the large compilation burst remains.
+
+A separate pair of Null replays matched 21.355 seconds of guest DSP audio sample for sample.
+
 ### Dev.35 Disc 1 boss replays
 
 Three isolated dev.34 launches loaded the Tank, Ninja and first Sniper Wolf fights from USA Very Easy practice saves. Each encounter responded to scripted analog input and preserved its memory-card save. [Practice-save source](https://www.speedrun.com/mgstts/resources)
