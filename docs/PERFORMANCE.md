@@ -618,6 +618,12 @@ All runs exited normally. Each loopback capture recorded about 33 seconds with n
 
 Four additional order-reversed 33-second runs used shared threads and kept the same Vulkan settings while switching internal scale. The 1× runs recorded 68 of 266 samples below 95%, a minimum of 57.5%, and a full-interval guest-clock rate of 95.1–97.9%. The 4× runs recorded 32 of 266 below 95%, a minimum of 83.8%, and a full-interval rate of 99.0–99.4%. The maximum vertical blank intervals were 61.04 ms at 1× and 73.59 ms at 4×. All four captured about 27 seconds of audio with no packet discontinuities or timestamp gaps above 2 ms. The slowdown persisted at the original resolution, and these runs leave its precise cause open.
 
+#### Dev.47 offscreen final-pursuit comparison
+
+Four order-reversed 20-second replays compared the packaged dev.46 and dev.47 runners at the same Disc 2 checkpoint. They used 4× offscreen Vulkan, accurate framebuffer copies, the same shader cache and the same native boot module. Dev.46 advanced at 89.9–93.6% of real time with 75 of 162 samples below 95%. Dev.47 advanced at 87.6–90.6% with 80 of 162 samples below 95%. The range overlaps across builds.
+
+Two runs per CPU mode reversed the run order with the Null backend and audio disabled. JIT-only advanced at 99.7–99.9% of real time with zero of 161 samples below 95%. Hybrid advanced at 91.5–94.9% with 55 of 162 samples below 95%. Its median speed still rounded to 100% in both runs. The 486 MHz throttle limit stayed constant in all eight replays, and all exited normally. The Null replays isolate a repeatable slowdown in the hybrid execution path at this checkpoint. A matched guest-tick CPU profile can locate the cost before the next optimization.
+
 ### Dev.35 Disc 1 boss replays
 
 Three isolated dev.34 launches loaded the Tank, Ninja and first Sniper Wolf fights from USA Very Easy practice saves. Each encounter responded to scripted analog input and preserved its memory-card save. [Practice-save source](https://www.speedrun.com/mgstts/resources)
