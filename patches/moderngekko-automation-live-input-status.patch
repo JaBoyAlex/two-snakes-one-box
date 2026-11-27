@@ -1,0 +1,76 @@
+diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
+--- a/src/runtime/dolphin_runtime.cpp
++++ b/src/runtime/dolphin_runtime.cpp
+@@ -292,10 +292,12 @@
+   return {};
+ }
+ 
++template <typename PublishStatus>
+ std::optional<RuntimeError> ApplyAutomationCommand(Runtime& runtime,
+                                                    RuntimeAutomationState& state,
+                                                    const automation::Command& command,
+-                                                   std::stop_token stop_token)
++                                                   std::stop_token stop_token,
++                                                   const PublishStatus& publish_status)
+ {
+   auto& system = Core::System::GetInstance();
+   switch (command.type)
+@@ -320,6 +322,7 @@
+         first_frame = current_frame;
+       else if (current_frame - first_frame >= command.duration)
+         break;
++      publish_status();
+       std::this_thread::sleep_for(std::chrono::milliseconds(1));
+     }
+     ClearAutomationPad(command.pad.port);
+@@ -360,6 +363,7 @@
+     while (!completed.load(std::memory_order_relaxed) && !stop_token.stop_requested() &&
+            Core::GetState(system) == Core::State::Running)
+     {
++      publish_status();
+       std::this_thread::sleep_for(std::chrono::milliseconds(1));
+     }
+     field_hook.reset();
+@@ -543,9 +547,17 @@
+     throttle_clock.store(timing.GetThrottleClock(), std::memory_order_relaxed);
+   });
+   auto next_status_write = std::chrono::steady_clock::now();
++  const auto publish_status = [&] {
++    const auto now = std::chrono::steady_clock::now();
++    if (now >= next_status_write)
++    {
++      WriteAutomationStatus(root, impl);
++      next_status_write = now + std::chrono::milliseconds(200);
++    }
++  };
++
+   while (!stop_token.stop_requested())
+   {
+-
+     for (const auto& command_path : automation::ListCommandFiles(root / "commands"))
+     {
+       automation::Command command;
+@@ -565,7 +577,8 @@
+         command.path = automation::ResolveControlPath(root, command.path);
+ 
+       if (auto runtime_error =
+-              ApplyAutomationCommand(runtime, impl.automation_state, command, stop_token))
++              ApplyAutomationCommand(runtime, impl.automation_state, command, stop_token,
++                                     publish_status))
+       {
+         SetAutomationError(impl.automation_state,
+                            command.source_name + ": " + runtime_error->message);
+@@ -576,12 +589,7 @@
+       MoveAutomationCommand(command_path, root, "processed");
+     }
+ 
+-    const auto now = std::chrono::steady_clock::now();
+-    if (now >= next_status_write)
+-    {
+-      WriteAutomationStatus(root, impl);
+-      next_status_write = now + std::chrono::milliseconds(200);
+-    }
++    publish_status();
+     std::this_thread::sleep_for(std::chrono::milliseconds(50));
+   }
+ 

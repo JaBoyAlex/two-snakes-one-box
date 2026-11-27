@@ -17,7 +17,7 @@ diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
    {
      std::lock_guard lock(impl.automation_state.mutex);
      status.processed_commands = impl.automation_state.processed_commands;
-@@ -519,10 +521,13 @@
+@@ -519,9 +521,12 @@
  
    EnsureAutomationDirectories(root);
    auto& guest_ticks = impl.automation_state.guest_ticks;
@@ -31,7 +31,6 @@ diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
 +    throttle_clock.store(timing.GetThrottleClock(), std::memory_order_relaxed);
    });
    auto next_status_write = std::chrono::steady_clock::now();
-   while (!stop_token.stop_requested())
 diff --git a/tools/automation_protocol.hpp b/tools/automation_protocol.hpp
 --- a/tools/automation_protocol.hpp
 +++ b/tools/automation_protocol.hpp

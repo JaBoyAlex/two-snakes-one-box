@@ -65,7 +65,7 @@ The runtime’s debug automation reports `load_state` as processed after the CPU
 
 For timing comparisons with a source-built runner, `command=pad_fields` holds controller input for the requested number of emulated video fields. Supply `port`, `fields` and any controls you want to hold. The hold starts at the next field boundary, and the command completes after the last field. `pad_frames` remains available for scripts timed to newly drawn frames.
 
-Use `pad_sequence` when a replay needs several consecutive holds. Each step replaces the previous controller state at a guest video field boundary. A step with only `fields` supplies neutral input. Number steps from 1 without gaps. The runner validates the entire command before applying it and clears the input override after the last step. Each command supports up to 1,024 steps and 36,000 fields total.
+Use `pad_sequence` when a replay needs several consecutive holds. Each step replaces the previous controller state at a guest video field boundary. A step with only `fields` supplies neutral input. Number steps from 1 without gaps. The runner validates the entire command before applying it and clears the input override after the last step. Each command supports up to 1,024 steps and 36,000 fields total. In dev.54 and later, `status.txt` continues to report guest ticks and presents during a timed input command. `last_command` advances when the command finishes.
 
 ```ini
 command=pad_sequence
