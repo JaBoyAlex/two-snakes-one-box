@@ -581,10 +581,15 @@ These windowed Disc 2 replays started from the same checkpoint after the second 
 | Dev.42 Vulkan initial run | 55 s | 127.1% | 3/221 | 55.15 ms | Forced after stop timeout |
 | Dev.42 Vulkan order-reversed controls | 42 s each | 100% each | 9/338 | 61.61 ms | Both normal |
 | Dev.44 Vulkan title-queue candidate | 42 s each | 100% each | 2/338 | 65.54 ms | Both normal |
+| Dev.45 Vulkan with throttle diagnostics | 55 s | 100% | 14/221 | 55.87 ms | Normal |
 
 The four order-reversed replays each included a gap of about 3.56 seconds between newly rendered frames while guest timing kept advancing. Windows process loopback captured 36 seconds of audible output in each replay with zero reported packet discontinuities or timestamp gaps above 2 ms. The longer Direct3D 11 and Vulkan replays recorded about 49 audible seconds each with the same loopback result.
 
 The initial Vulkan trace confirmed faster-than-normal guest progression for tens of seconds. The stop command was processed, but the runner did not exit. A separate Win32 fixture reproduced a title update blocking its caller when the window thread had stopped dispatching messages. Posting the update to the window thread resolved the fixture. The paired game replays did not reproduce either symptom, and the cause of the speed excursion remains open.
+
+Dev.45 reported a 486 MHz throttle limit throughout the 55-second replay. Its 49-second audio capture reported zero packet discontinuities or timestamp gaps above 2 ms. In two separate 31-second replays, both JIT-only and hybrid execution recorded a 3.56–3.58 second gap between new draws while guest time advanced, with 100% median game speed across each replay. The JIT-only run had zero of 125 samples below 95%, with a 99.8% floor. The hybrid run had three of 125 below 95%, with a 93.5% floor. Both 25-second audio captures reported zero packet discontinuities or timestamp gaps above 2 ms.
+
+In a longer dev.45 pair, the shared CPU and graphics thread used 555.9 ms of CPU time per guest second in JIT-only mode and 767.5 ms in hybrid mode over 53.670 matched guest seconds. Both reported the normal throttle rate throughout and logged a roughly 3.58-second draw interval. The JIT-only replay recorded four of 217 samples below 95% game speed and the hybrid replay recorded 14 of 217. Both captured about 48 seconds of audio with zero reported packet discontinuities or timestamp gaps above 2 ms. This comparison measures the CPU budget for the whole shared thread, including graphics work and timing waits.
 
 ### Dev.35 Disc 1 boss replays
 

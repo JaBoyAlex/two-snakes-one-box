@@ -1,0 +1,28 @@
+diff --git a/Source/Core/Core/CoreTiming.h b/Source/Core/Core/CoreTiming.h
+--- a/Source/Core/Core/CoreTiming.h
++++ b/Source/Core/Core/CoreTiming.h
+@@ -162,6 +162,9 @@
+   // Throttle the CPU to the specified target cycle.
+   void Throttle(const s64 target_cycle);
+ 
++  // The CPU thread reads the active throttle rate in guest cycles per second. Zero is unlimited.
++  u32 GetThrottleClock() const;
++
+   // May be used from CPU or GPU thread.
+   void SleepUntil(TimePoint time_point);
+ 
+diff --git a/Source/Core/Core/CoreTiming.cpp b/Source/Core/Core/CoreTiming.cpp
+--- a/Source/Core/Core/CoreTiming.cpp
++++ b/Source/Core/Core/CoreTiming.cpp
+@@ -399,6 +399,11 @@
+   return m_throttle_adj_clock_per_sec == 0 || Core::GetIsThrottlerTempDisabled();
+ }
+ 
++u32 CoreTimingManager::GetThrottleClock() const
++{
++  return IsSpeedUnlimited() ? 0 : m_throttle_adj_clock_per_sec;
++}
++
+ TimePoint CoreTimingManager::GetTargetHostTime(s64 target_cycle)
+ {
+   if (IsSpeedUnlimited())

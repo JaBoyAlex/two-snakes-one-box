@@ -1,0 +1,75 @@
+diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
+--- a/src/runtime/dolphin_runtime.cpp
++++ b/src/runtime/dolphin_runtime.cpp
+@@ -172,6 +172,7 @@
+   std::atomic<std::uint64_t> frame_count{0};
+   std::atomic<std::uint64_t> present_count{0};
+   std::atomic<std::uint64_t> guest_ticks{0};
++  std::atomic<std::uint32_t> throttle_clock_hz{0};
+   std::uint64_t processed_commands = 0;
+   std::string last_command;
+   std::string last_error;
+@@ -487,6 +488,7 @@
+   status.present_count =
+       impl.automation_state.present_count.load(std::memory_order_relaxed);
+   status.guest_ticks = impl.automation_state.guest_ticks.load(std::memory_order_relaxed);
++  status.throttle_clock_hz = impl.automation_state.throttle_clock_hz.load(std::memory_order_relaxed);
+   {
+     std::lock_guard lock(impl.automation_state.mutex);
+     status.processed_commands = impl.automation_state.processed_commands;
+@@ -519,10 +521,13 @@
+ 
+   EnsureAutomationDirectories(root);
+   auto& guest_ticks = impl.automation_state.guest_ticks;
++  auto& throttle_clock = impl.automation_state.throttle_clock_hz;
+   guest_ticks.store(0, std::memory_order_relaxed);
+-  const auto guest_ticks_hook = GetVideoEvents().vi_end_field_event.Register([&guest_ticks] {
++  throttle_clock.store(0, std::memory_order_relaxed);
++  const auto timing_hook = GetVideoEvents().vi_end_field_event.Register([&guest_ticks, &throttle_clock] {
+     const auto& timing = Core::System::GetInstance().GetCoreTiming();
+     guest_ticks.store(timing.GetTicks(), std::memory_order_relaxed);
++    throttle_clock.store(timing.GetThrottleClock(), std::memory_order_relaxed);
+   });
+   auto next_status_write = std::chrono::steady_clock::now();
+   while (!stop_token.stop_requested())
+diff --git a/tools/automation_protocol.hpp b/tools/automation_protocol.hpp
+--- a/tools/automation_protocol.hpp
++++ b/tools/automation_protocol.hpp
+@@ -57,6 +57,7 @@
+   std::uint64_t frame_count = 0;
+   std::uint64_t present_count = 0;
+   std::uint64_t guest_ticks = 0;
++  std::uint32_t throttle_clock_hz = 0;
+   std::string title;
+   std::string game_id;
+   std::string game_name;
+diff --git a/tools/automation_protocol.cpp b/tools/automation_protocol.cpp
+--- a/tools/automation_protocol.cpp
++++ b/tools/automation_protocol.cpp
+@@ -529,6 +529,7 @@
+   output << "frame_count=" << status.frame_count << '\n';
+   output << "present_count=" << status.present_count << '\n';
+   output << "guest_ticks=" << status.guest_ticks << '\n';
++  output << "throttle_clock_hz=" << status.throttle_clock_hz << '\n';
+   output << "title=" << status.title << '\n';
+   output << "game_id=" << status.game_id << '\n';
+   output << "game_name=" << status.game_name << '\n';
+diff --git a/tests/automation_protocol_test.cpp b/tests/automation_protocol_test.cpp
+--- a/tests/automation_protocol_test.cpp
++++ b/tests/automation_protocol_test.cpp
+@@ -75,6 +75,7 @@
+   status.frame_count = 120;
+   status.present_count = 121;
+   status.guest_ticks = 5000000000ull;
++  status.throttle_clock_hz = 486000000;
+   status.navigation_mode = 2;
+   status.navigation_valid = true;
+   status.navigation_room_id = 3;
+@@ -93,6 +94,7 @@
+       !formatted.contains("frame_count=120\n") ||
+       !formatted.contains("present_count=121\n") ||
+       !formatted.contains("guest_ticks=5000000000\n") ||
++      !formatted.contains("throttle_clock_hz=486000000\n") ||
+       !formatted.contains("navigation_mode=2\n") ||
+       !formatted.contains("navigation_valid=1\n") ||
+       !formatted.contains("navigation_room_id=3\n") ||

@@ -51,6 +51,7 @@ WINDOWS_INLINE_NOTICES = (
 PATCH_PREREQUISITES = {
     'moderngekko-skip-duplicate-game-inspection.patch': ('moderngekko-disc-pair.patch',),
     'moderngekko-cache-asset-relative-paths.patch': ('moderngekko-windows-asset-hash.patch',),
+    'moderngekko-automation-throttle-clock.patch': ('moderngekko-automation-guest-ticks.patch',),
     'recompcore-gamepad-bindings.patch': ('recompcore-auto-gamepad.patch',),
     'recompcore-win32-fullscreen.patch': ('recompcore-win32-window-teardown.patch',),
     'recompcore-twin-snakes-controller-port.patch': ('recompcore-win32-fullscreen.patch',),
@@ -113,10 +114,11 @@ def main():
     apply_patch(source, 'moderngekko-automation-present-count.patch')
     apply_patch(source, 'moderngekko-automation-pad-fields.patch')
     apply_patch(source, 'moderngekko-twin-snakes-xfb-default.patch')
-    apply_patch(source, 'moderngekko-automation-guest-ticks.patch')
+    apply_patch(source, 'moderngekko-automation-throttle-clock.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-empty-gamepad-config.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-win32-title-queue.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-throttle-clock.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-fastmem.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fixed-dispatch-bounds.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fixed-fallback-lookup.patch')

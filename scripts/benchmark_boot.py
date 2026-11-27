@@ -137,6 +137,7 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                     frame = int(state['frame_count'])
                     presents = int(state['present_count'])
                     guest_ticks = int(state['guest_ticks']) if 'guest_ticks' in state else None
+                    throttle_clock = int(state['throttle_clock_hz']) if 'throttle_clock_hz' in state else None
                     if windowed:
                         vps = float(state['vps'])
                         fps = float(state['fps'])
@@ -170,6 +171,8 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                               'frame_count': frame, 'present_count': presents}
                     if guest_ticks is not None:
                         sample['guest_ticks'] = guest_ticks
+                    if throttle_clock is not None:
+                        sample['throttle_clock_hz'] = throttle_clock
                     if windowed:
                         sample.update({'vps': vps, 'fps': fps})
                     samples.append(sample)
@@ -208,6 +211,9 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
             summary['guest_tick_range'] = {
                 'start': samples[0]['guest_ticks'], 'end': samples[-1]['guest_ticks'],
             }
+        throttle_clocks = {sample['throttle_clock_hz'] for sample in samples if 'throttle_clock_hz' in sample}
+        if throttle_clocks:
+            summary['throttle_clocks_hz'] = sorted(throttle_clocks)
     if load_state:
         summary['checkpoint_ready_seconds'] = round(began_sampling - start, 2) if began_sampling is not None else None
         if began_sampling is None:
