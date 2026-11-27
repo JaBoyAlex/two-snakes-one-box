@@ -68,6 +68,7 @@
   "patches/recompcore-verified-virtual-code.patch",
   "patches/recompcore-win32-focus-speed.patch",
   "patches/recompcore-win32-fullscreen.patch",
+  "patches/recompcore-win32-monitor-position.patch",
   "patches/recompcore-win32-title-queue.patch",
   "patches/recompcore-win32-window-teardown.patch",
   "patches/recompcore-x64-condition-register.patch",

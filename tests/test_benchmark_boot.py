@@ -21,11 +21,13 @@ class BenchmarkTests(unittest.TestCase):
                 process.returncode = 0
                 benchmark_boot.benchmark('aot', 'runner', 'disc', 'module', work,
                                          True, 'D3D', 1, None, False,
-                                         frame_times=True, xfb_copies=mode)
+                                         frame_times=True, xfb_copies=mode, window_position=(-1500, 660))
                 graphics = (work / 'user/Config/GFX.ini').read_text()
                 self.assertIn('[Settings]\nLogRenderTimeToFile = True', graphics)
                 self.assertIn(f'[Hacks]\nXFBToTextureEnable = {texture_only}', graphics)
-                self.assertIn('[DSP]\nVolume = 5\n', (work / 'user/Config/Dolphin.ini').read_text())
+                dolphin = (work / 'user/Config/Dolphin.ini').read_text()
+                self.assertIn('[DSP]\nVolume = 5\n', dolphin)
+                self.assertIn('[Display]\nRenderWindowXPos = -1500\nRenderWindowYPos = 660\n', dolphin)
                 summary = json.loads((work / 'summary.json').read_text())
                 self.assertEqual(summary['xfb_copies_requested'], mode)
 

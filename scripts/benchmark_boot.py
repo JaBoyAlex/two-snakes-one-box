@@ -68,7 +68,7 @@ def summarize_counter_pauses(samples, counter):
 
 def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load_state, dispatch_samples,
               *, dual_core=None, frame_times=False, internal_scale=1, fullscreen=False,
-              alternate_disc=None, shader_cache_seed=None, xfb_copies=None):
+              alternate_disc=None, shader_cache_seed=None, xfb_copies=None, window_position=None):
     control = work / 'control'
     command_dir = control / 'commands'
     command_dir.mkdir(parents=True)
@@ -87,6 +87,9 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
         dolphin_settings += '[Interface]\nUsePanicHandlers = False\n'
     if windowed:
         dolphin_settings += '[DSP]\nVolume = 5\n'
+        if window_position is not None:
+            x, y = window_position
+            dolphin_settings += f'[Display]\nRenderWindowXPos = {x}\nRenderWindowYPos = {y}\n'
     if dolphin_settings:
         (config / 'Dolphin.ini').write_text(dolphin_settings, encoding='ascii')
     interval_logs = {}
@@ -275,6 +278,8 @@ def main():
     parser.add_argument('--internal-scale', type=int, default=1, metavar='N',
                         help='Integer EFB render scale in the isolated profile, from 1 to 12 (default: 1)')
     parser.add_argument('--fullscreen', action='store_true', help='Start the windowed benchmark in borderless fullscreen')
+    parser.add_argument('--window-position', nargs=2, type=int, metavar=('X', 'Y'),
+                        help='Start the test window at desktop coordinates X Y')
     parser.add_argument('--mode', choices=['aot', 'jit', 'both'],
                         help='Default: both, or aot in a comparison')
     display = parser.add_mutually_exclusive_group()
@@ -303,6 +308,8 @@ def main():
         parser.error('--frame-times requires --windowed')
     if args.fullscreen and not windowed:
         parser.error('--fullscreen requires --windowed')
+    if args.window_position and not windowed:
+        parser.error('--window-position requires --windowed')
     shader_cache_seed = args.shader_cache_seed.resolve() if args.shader_cache_seed else None
     if shader_cache_seed is not None and not shader_cache_seed.is_dir():
         parser.error('--shader-cache-seed must be an existing Cache directory')
@@ -354,7 +361,8 @@ def main():
                                   load_state, args.dispatch_samples, dual_core=dual_core,
                                   frame_times=args.frame_times, internal_scale=args.internal_scale,
                                   fullscreen=args.fullscreen, alternate_disc=alternate_disc,
-                                  shader_cache_seed=shader_cache_seed, xfb_copies=args.xfb_copies))
+                                  shader_cache_seed=shader_cache_seed, xfb_copies=args.xfb_copies,
+                                  window_position=args.window_position))
     print(f'Private logs and samples: {work}')
     return 0 if all(outcomes) else 1
 
