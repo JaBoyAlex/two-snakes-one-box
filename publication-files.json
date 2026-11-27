@@ -56,6 +56,7 @@
   "patches/recompcore-headless-shader-progress.patch",
   "patches/recompcore-headless-vulkan-submit.patch",
   "patches/recompcore-jit-analysis-ranges.patch",
+  "patches/recompcore-jit-move-ranges.patch",
   "patches/recompcore-llvm-region-check.patch",
   "patches/recompcore-register-sync.patch",
   "patches/recompcore-savestate-disc-check.patch",

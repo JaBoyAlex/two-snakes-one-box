@@ -1,0 +1,34 @@
+diff --git a/Source/Core/Core/PowerPC/JitCommon/JitCache.cpp b/Source/Core/Core/PowerPC/JitCommon/JitCache.cpp
+--- a/Source/Core/Core/PowerPC/JitCommon/JitCache.cpp
++++ b/Source/Core/Core/PowerPC/JitCommon/JitCache.cpp
+@@ -143,7 +143,7 @@
+ }
+ 
+ void JitBaseBlockCache::FinalizeBlock(JitBlock& block, bool block_link,
+-                                      const PPCAnalyst::CodeBlock& code_block,
++                                      PPCAnalyst::CodeBlock& code_block,
+                                       const PPCAnalyst::CodeBuffer& code_buffer)
+ {
+   size_t index = FastLookupIndexForAddress(block.effectiveAddress, block.feature_flags);
+@@ -158,7 +158,8 @@
+   }
+   block.fast_block_map_index = index;
+ 
+-  block.physical_addresses = code_block.m_physical_addresses;
++  // The analyzer clears its scratch ranges before analyzing the next block.
++  block.physical_addresses = std::move(code_block.m_physical_addresses);
+ 
+   block.originalSize = code_block.m_num_instructions;
+   if (m_jit.IsDebuggingEnabled())
+diff --git a/Source/Core/Core/PowerPC/JitCommon/JitCache.h b/Source/Core/Core/PowerPC/JitCommon/JitCache.h
+--- a/Source/Core/Core/PowerPC/JitCommon/JitCache.h
++++ b/Source/Core/Core/PowerPC/JitCommon/JitCache.h
+@@ -170,7 +170,7 @@
+   std::size_t GetBlockCount() const { return block_map.size(); }
+ 
+   JitBlock* AllocateBlock(u32 em_address);
+-  void FinalizeBlock(JitBlock& block, bool block_link, const PPCAnalyst::CodeBlock& code_block,
++  void FinalizeBlock(JitBlock& block, bool block_link, PPCAnalyst::CodeBlock& code_block,
+                      const PPCAnalyst::CodeBuffer& code_buffer);
+ 
+   // Look for the block in the slow but accurate way.

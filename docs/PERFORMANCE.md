@@ -675,6 +675,12 @@ A private trial kept branch following for the first 256 compiled blocks per vide
 
 Four 38-second replays repeated this trial at 4× Vulkan with accurate framebuffer copies and Cubeb audio at 5% test volume on the secondary display. The compilation-heavy interval fell from 38.12–44.43 ms to 27.89–27.93 ms. Over 37.371 matched guest seconds, the limit increased CPU time from 671–687 to 804–807 ms per emulated second. Samples below 95% rose from nine to 47 out of 306 per path. The longest video-update intervals were 54.10–54.24 ms in the control and 55.68–62.67 ms with the limit. Each Windows audio capture reported zero packet discontinuities and all runs exited normally. The compilation limit stays private because it worsened pacing across the scene.
 
+#### Moving JIT instruction ranges into the cache
+
+The analyzer builds the physical instruction ranges that each compiled block needs for invalidation. The cache now takes ownership of those ranges when it finalizes the block. A Windows MSVC test measured zero allocations for the move and one allocation per range for the copy. It checked that the range set remains intact when the analyzer clears and reuses its scratch storage.
+
+In four order-reversed 37-second Null replays, moving the ranges used 0.035 ms in the roughly 1,370-block pursuit burst. Copying used 0.235–0.244 ms. Over 36.904 matched guest seconds, the candidate used 672–673 ms of thread CPU time per emulated second and the reference used 673–677 ms. All four replays held about 100% game speed throughout the sampling window with zero samples below 95%, and exited normally. The transfer saves about 0.2 ms in that burst. Most of the hitch is in other work, including code generation.
+
 ### Dev.35 Disc 1 boss replays
 
 Three isolated dev.34 launches loaded the Tank, Ninja and first Sniper Wolf fights from USA Very Easy practice saves. Each encounter responded to scripted analog input and preserved its memory-card save. [Practice-save source](https://www.speedrun.com/mgstts/resources)
