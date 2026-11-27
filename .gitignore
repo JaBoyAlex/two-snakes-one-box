@@ -21,5 +21,6 @@ __pycache__/
 *.raw
 *.gci
 *.sav
+*.dtm
 *.log
 .venv/

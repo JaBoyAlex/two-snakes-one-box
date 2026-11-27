@@ -84,7 +84,7 @@ class PackageWindowsTests(unittest.TestCase):
 
     def test_rejects_private_runtime_inputs(self):
         for relative in ('sdk/module-template/generated/translated.c', 'recompdata/prepared.json',
-                         'game.GGSEA4_Recomp.DLL', 'latest.LOG', 'run.profraw'):
+                         'game.GGSEA4_Recomp.DLL', 'latest.LOG', 'run.profraw', 'dock.dtm', 'door.sav.DTM'):
             with self.subTest(path=relative), TemporaryDirectory() as directory:
                 root = Path(directory)
                 path = root / relative

@@ -14,7 +14,7 @@ VC_FILES = ['msvcp140.dll', 'msvcp140_atomic_wait.dll', 'vcruntime140.dll', 'vcr
 PRIVATE_DIRECTORIES = {'.local', 'recompdata', 'statesaves'}
 PRIVATE_RUNTIME_DIRECTORIES = PRIVATE_DIRECTORIES | {'cache', 'dump', 'generated', 'logs', 'saves', 'user'}
 PRIVATE_SUFFIXES = {
-    '.iso', '.gcm', '.rvz', '.gcz', '.dol', '.rel', '.gci', '.raw', '.sav',
+    '.iso', '.gcm', '.rvz', '.gcz', '.dol', '.rel', '.gci', '.raw', '.sav', '.dtm',
     '.log', '.dmp', '.trace', '.profraw', '.profdata',
 }
 
