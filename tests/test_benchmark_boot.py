@@ -63,8 +63,8 @@ class BenchmarkTests(unittest.TestCase):
             })
 
     def test_distinguishes_new_frames_from_duplicate_presents(self):
-        for advancing in (False, True):
-            with self.subTest(advancing=advancing), TemporaryDirectory() as directory:
+        for advancing, reset_clock in ((False, False), (True, False), (True, True)):
+            with self.subTest(advancing=advancing, reset_clock=reset_clock), TemporaryDirectory() as directory:
                 work = Path(directory)
                 elapsed = 0.0
 
@@ -72,7 +72,10 @@ class BenchmarkTests(unittest.TestCase):
                     nonlocal elapsed
                     elapsed += interval
                     frame = int(elapsed * 30) if advancing else 1
-                    clock = (f'guest_ticks={5_000_000_000 + int(elapsed * 486_000_000)}\n'
+                    ticks = 5_000_000_000 + int(elapsed * 486_000_000)
+                    if reset_clock and elapsed >= 4.0:
+                        ticks -= 1_000_000_000
+                    clock = (f'guest_ticks={ticks}\n'
                              f'throttle_clock_hz={486_000_000 if elapsed < 4.0 else 0}\n') if advancing else ''
                     (work / 'control/status.txt').write_text(
                         f'booted=1\nstate=running\nspeed=1\nvps=60\nfps=30\n'
@@ -95,8 +98,12 @@ class BenchmarkTests(unittest.TestCase):
                 self.assertEqual(succeeded, advancing)
                 self.assertEqual('median_speed' in summary, advancing)
                 self.assertEqual('guest_ticks' in summary['samples'][0], advancing)
+                self.assertEqual('guest_ticks_per_host_second' in summary, advancing and not reset_clock)
                 if advancing:
-                    self.assertEqual(summary['guest_tick_range'], {'start': 6_579_500_000, 'end': 7_065_500_000})
+                    expected_end = 6_065_500_000 if reset_clock else 7_065_500_000
+                    self.assertEqual(summary['guest_tick_range'], {'start': 6_579_500_000, 'end': expected_end})
+                    if not reset_clock:
+                        self.assertEqual(summary['guest_ticks_per_host_second'], 486_000_000)
                     self.assertEqual(summary['throttle_clocks_hz'], [0, 486_000_000])
                     self.assertEqual(summary['samples'][0]['throttle_clock_hz'], 486_000_000)
                 else:

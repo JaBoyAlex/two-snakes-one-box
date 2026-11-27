@@ -216,6 +216,11 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
             summary['guest_tick_range'] = {
                 'start': samples[0]['guest_ticks'], 'end': samples[-1]['guest_ticks'],
             }
+            elapsed = sample_end[0] - sample_start[0]
+            ticks = [sample.get('guest_ticks') for sample in samples]
+            if elapsed > 0 and all(previous is not None and current is not None and previous <= current
+                                   for previous, current in zip(ticks, ticks[1:])):
+                summary['guest_ticks_per_host_second'] = round((ticks[-1] - ticks[0]) / elapsed)
         throttle_clocks = {sample['throttle_clock_hz'] for sample in samples if 'throttle_clock_hz' in sample}
         if throttle_clocks:
             summary['throttle_clocks_hz'] = sorted(throttle_clocks)
