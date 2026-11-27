@@ -591,6 +591,10 @@ Dev.45 reported a 486 MHz throttle limit throughout the 55-second replay. Its 49
 
 In a longer dev.45 pair, the shared CPU and graphics thread used 555.9 ms of CPU time per guest second in JIT-only mode and 767.5 ms in hybrid mode over 53.670 matched guest seconds. Both reported the normal throttle rate throughout and logged a roughly 3.58-second draw interval. The JIT-only replay recorded four of 217 samples below 95% game speed and the hybrid replay recorded 14 of 217. Both captured about 48 seconds of audio with zero reported packet discontinuities or timestamp gaps above 2 ms. This comparison measures the CPU budget for the whole shared thread, including graphics work and timing waits.
 
+An independent sampling run recorded 179 of 640 hybrid instruction pointers inside the native module. Floating-point helpers accounted for 18 of those module samples in the two software paths that call the host fused multiply-add function. The runtime's dispatch loop and register synchronization also appeared among sampled costs.
+
+Two 38-second replays per vector profile reversed the run order at 4× Vulkan and compared 37.538 seconds of matched guest time. The regular profile used 726–746 ms of CPU time per guest second. The existing opt-in vector JIT profile used 720–750 ms. The vector profile had fewer samples below 95% game speed, with 30 of 306 versus 38 of 306, and reached a lower minimum of 74.2% versus 87.8%. All four reached 100% median speed and all four audio captures reported zero packet discontinuities or timestamp gaps above 2 ms. The vector profile remains opt-in.
+
 ### Dev.35 Disc 1 boss replays
 
 Three isolated dev.34 launches loaded the Tank, Ninja and first Sniper Wolf fights from USA Very Easy practice saves. Each encounter responded to scripted analog input and preserved its memory-card save. [Practice-save source](https://www.speedrun.com/mgstts/resources)
