@@ -11,6 +11,22 @@ import benchmark_boot
 
 
 class BenchmarkTests(unittest.TestCase):
+    def test_compare_scale_runs_in_both_orders_with_the_same_backend(self):
+        with TemporaryDirectory() as directory:
+            work = Path(directory)
+            runner = work / 'runner'
+            runner.touch()
+            (work / 'prepared.json').write_text(json.dumps({'discs': [{'root': 'disc', 'module': 'module'}]}))
+            argv = ['benchmark_boot', '--data', directory, '--runner', str(runner), '--output', directory,
+                    '--windowed', 'Vulkan', '--internal-scale', '1', '--compare-scale', '4']
+            with (patch.object(sys, 'argv', argv), patch.object(benchmark_boot, 'benchmark', return_value=True) as run,
+                  patch('builtins.print')):
+                self.assertEqual(benchmark_boot.main(), 0)
+            self.assertEqual([call.args[4].name for call in run.call_args_list],
+                             ['1x-first', '4x-second', '4x-first', '1x-second'])
+            self.assertEqual([call.kwargs['internal_scale'] for call in run.call_args_list], [1, 4, 4, 1])
+            self.assertTrue(all(call.args[6] == 'Vulkan' and call.args[0] == 'aot' for call in run.call_args_list))
+
     def test_xfb_override_keeps_frame_interval_logging(self):
         for mode, texture_only in (('guest-memory', 'False'), ('texture-only', 'True')):
             with (self.subTest(mode=mode), TemporaryDirectory() as directory,

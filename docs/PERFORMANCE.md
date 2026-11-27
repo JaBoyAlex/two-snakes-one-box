@@ -44,6 +44,8 @@ The benchmark reports startup time from process launch to the first poll that ob
 
 Use `--compare-threading` to run shared and separate CPU/video threads in both orders against the same runner and checkpoint. It defaults to hybrid execution. With `--shader-cache-seed PATH`, every run starts with its own copy of the supplied local `Cache` directory. Seed from a completed run with the same backend and GPU so each case starts with the same pipeline data.
 
+Use `--internal-scale 1 --compare-scale 4` with the same renderer to compare internal resolution in both orders. The speed limit, framebuffer copy mode and window placement use the same settings in all four runs. For a visual test, use `--windowed` with `--window-position X Y`. Windowed benchmarks start at 5% audio volume in their disposable profiles.
+
 Use `--xfb-copies guest-memory` and `--xfb-copies texture-only` on matched runs to measure the cost of framebuffer readback. Without this flag, the benchmark uses the runner's default in its isolated profile.
 
 Use `--load-state PATH` to compare the same scene. Add `--dispatch-samples` to collect native dispatch counts during the replay. Benchmark profiles and logs default to a subdirectory of the system temporary directory. Use `--output PATH` to retain traces elsewhere. One run in a synced workspace failed to replace the test profile's filesystem metadata (`IOS_FS: Failed to rename temporary FST file`). Repeat runs with isolated profiles outside the synced workspace completed successfully.
@@ -600,6 +602,21 @@ Two 38-second replays per vector profile reversed the run order at 4× Vulkan an
 A private module build used hardware fused multiply-add only in the two sampled floating-point helpers. Both helpers matched the regular module in 1,280,000 generated and edge cases across four rounding modes and with denormal handling enabled and disabled. In order-reversed 38-second Vulkan replays, the candidate used 724–755 ms of CPU time per guest second versus 702–748 ms for the regular module over 37.471 matched guest seconds. It recorded 37 of 306 samples below 95% speed versus 17 of 306 for the regular module and reached a 65.6% minimum versus 87.4%. Both modules held 100% median speed, with zero audio packet discontinuities or timestamp gaps above 2 ms across the four runs. The regular module remains the release candidate.
 
 Another private runtime trial reused the native module's game-ID decision until the running ID changed. Four order-reversed 31-second replays at 4× Vulkan used a seeded shader cache and the same Visual C++ DLLs. Over 29.780 seconds of matched guest time, the trial used 787–788 ms of CPU time per guest second and dev.46 used 763–779 ms. The trial recorded 54 of 250 samples below 95% versus 56 of 250 for dev.46, with a lower minimum of 72.5% versus 77.2%. All four had a median of 100%, with a measured guest-clock progression of 96.5–97.3% over the full sampling intervals. Each audio capture reported zero packet discontinuities or timestamp gaps above 2 ms. The existing game-ID lookup remains in the runtime.
+
+#### Dev.46 threading and internal scale
+
+Four order-reversed 39-second replays used dev.46, 4× Vulkan, a seeded shader cache and accurate framebuffer copies. The game kept its original speed limit. The guest-clock rate measures the total progression over each sampling window.
+
+| Threading | Guest-clock rate | Samples below 95% | Lowest speed sample | Longest vertical blank |
+| --- | ---: | ---: | ---: | ---: |
+| Shared, first | 99.1% | 18/157 | 84.2% | 62.85 ms |
+| Separate, second | 98.9% | 10/157 | 82.1% | 60.43 ms |
+| Separate, first | 98.8% | 10/157 | 77.6% | 70.82 ms |
+| Shared, second | 93.9% | 57/157 | 50.4% | 112.80 ms |
+
+All runs exited normally. Each loopback capture recorded about 33 seconds with no packet discontinuities or timestamp gaps above 2 ms. Separate threads reduced the number of slow samples in both orders, while their sustained speed was between the two shared runs. The launcher still uses shared threads by default pending broader validation.
+
+Four additional order-reversed 33-second runs used shared threads and kept the same Vulkan settings while switching internal scale. The 1× runs recorded 68 of 266 samples below 95%, a minimum of 57.5%, and a full-interval guest-clock rate of 95.1–97.9%. The 4× runs recorded 32 of 266 below 95%, a minimum of 83.8%, and a full-interval rate of 99.0–99.4%. The maximum vertical blank intervals were 61.04 ms at 1× and 73.59 ms at 4×. All four captured about 27 seconds of audio with no packet discontinuities or timestamp gaps above 2 ms. The slowdown persisted at the original resolution, and these runs leave its precise cause open.
 
 ### Dev.35 Disc 1 boss replays
 

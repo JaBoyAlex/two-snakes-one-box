@@ -266,6 +266,8 @@ def main():
                             help='Compare shared and separate CPU/video threads in both run orders')
     comparison.add_argument('--compare-backend', choices=backends,
                             help='Compare another graphics backend in both run orders')
+    comparison.add_argument('--compare-scale', type=int, metavar='N',
+                            help='Compare another internal render scale in both run orders')
     parser.add_argument('--disc', type=int, choices=[1, 2], default=1,
                         help='Boot the selected prepared disc (default: 1)')
     parser.add_argument('--load-state', type=Path, help='Replay a local save state for the selected disc')
@@ -289,7 +291,7 @@ def main():
                         help='Default: both, or aot in a comparison')
     display = parser.add_mutually_exclusive_group()
     display.add_argument('--windowed', nargs='?', const='Vulkan', choices=backends,
-                         help='Use a visible window and normal audio (default backend: Vulkan)')
+                         help='Use a visible window with 5%% audio volume (default backend: Vulkan)')
     display.add_argument('--offscreen', choices=backends,
                          help='Render with the selected backend without a window or audio output')
     display.add_argument('--offscreen-vulkan', dest='offscreen', action='store_const', const='Vulkan',
@@ -308,6 +310,11 @@ def main():
     backend = args.windowed or args.offscreen or 'Null'
     if args.compare_backend and (backend in ('Null', args.compare_backend) or args.mode == 'both'):
         parser.error('--compare-backend requires a different --windowed or --offscreen backend and a single CPU mode')
+    if args.compare_scale is not None:
+        if not 1 <= args.compare_scale <= 12 or args.compare_scale == args.internal_scale:
+            parser.error('--compare-scale must be a different internal scale between 1 and 12')
+        if backend == 'Null' or args.mode == 'both':
+            parser.error('--compare-scale requires a renderer and a single CPU mode')
     windowed = args.windowed is not None
     if args.frame_times and not windowed:
         parser.error('--frame-times requires --windowed')
@@ -340,31 +347,36 @@ def main():
         mode = args.mode or 'aot'
         candidate_module = args.compare_module.resolve(strict=True) if args.compare_module else module
         candidate_runner = args.compare_runner.resolve(strict=True) if args.compare_runner else runner
-        cases = [('reference-first', mode, runner, module, args.dual_core, backend),
-                 ('candidate-second', mode, candidate_runner, candidate_module, args.dual_core, backend),
-                 ('candidate-first', mode, candidate_runner, candidate_module, args.dual_core, backend),
-                 ('reference-second', mode, runner, module, args.dual_core, backend)]
+        cases = [('reference-first', mode, runner, module, args.dual_core, backend, args.internal_scale),
+                 ('candidate-second', mode, candidate_runner, candidate_module, args.dual_core, backend, args.internal_scale),
+                 ('candidate-first', mode, candidate_runner, candidate_module, args.dual_core, backend, args.internal_scale),
+                 ('reference-second', mode, runner, module, args.dual_core, backend, args.internal_scale)]
     elif args.compare_threading:
         mode = args.mode or 'aot'
-        cases = [('shared-first', mode, runner, module, False, backend),
-                 ('separate-second', mode, runner, module, True, backend),
-                 ('separate-first', mode, runner, module, True, backend),
-                 ('shared-second', mode, runner, module, False, backend)]
+        cases = [('shared-first', mode, runner, module, False, backend, args.internal_scale),
+                 ('separate-second', mode, runner, module, True, backend, args.internal_scale),
+                 ('separate-first', mode, runner, module, True, backend, args.internal_scale),
+                 ('shared-second', mode, runner, module, False, backend, args.internal_scale)]
     elif args.compare_backend:
         mode = args.mode or 'aot'
-        cases = [(f'{graphics.lower()}-{order}', mode, runner, module, args.dual_core, graphics)
+        cases = [(f'{graphics.lower()}-{order}', mode, runner, module, args.dual_core, graphics, args.internal_scale)
                  for graphics, order in [(backend, 'first'), (args.compare_backend, 'second'),
                                          (args.compare_backend, 'first'), (backend, 'second')]]
+    elif args.compare_scale is not None:
+        mode = args.mode or 'aot'
+        cases = [(f'{scale}x-{order}', mode, runner, module, args.dual_core, backend, scale)
+                 for scale, order in [(args.internal_scale, 'first'), (args.compare_scale, 'second'),
+                                      (args.compare_scale, 'first'), (args.internal_scale, 'second')]]
     else:
         modes = ['jit', 'aot'] if args.mode in (None, 'both') else [args.mode]
-        cases = [(mode, mode, runner, module, args.dual_core, backend) for mode in modes]
+        cases = [(mode, mode, runner, module, args.dual_core, backend, args.internal_scale) for mode in modes]
     outcomes = []
-    for label, mode, selected_runner, selected_module, dual_core, graphics in cases:
+    for label, mode, selected_runner, selected_module, dual_core, graphics, scale in cases:
         print(f'Running {label}', flush=True)
         outcomes.append(benchmark(mode, selected_runner, data / disc['root'], selected_module,
                                   work / label, windowed, graphics, args.seconds,
                                   load_state, args.dispatch_samples, dual_core=dual_core,
-                                  frame_times=args.frame_times, internal_scale=args.internal_scale,
+                                  frame_times=args.frame_times, internal_scale=scale,
                                   fullscreen=args.fullscreen, alternate_disc=alternate_disc,
                                   shader_cache_seed=shader_cache_seed, xfb_copies=args.xfb_copies,
                                   window_position=args.window_position))
