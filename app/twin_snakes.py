@@ -369,11 +369,14 @@ def prepare(args, runtime, data, log):
     if disc_hashes != [entry['sha256'] for entry in profile['discs']]:
         raise DiscError('A disc differs from the supported reference dump. See supported-builds.json.')
     rel_layout = profile['rel']
+    codegen = {'DOLRECOMP_C_CHUNK_INSTRUCTIONS': '4096' if args.experimental_rel else '1024',
+               'DOLRECOMP_DISPATCH_LOOKUP': 'linear'}
+    env.update(codegen)
     identity = {'format': BUILD_FORMAT, 'discs': disc_hashes,
                 'runtime': digest(runtime / 'dependencies.lock.json'),
                 'recompiler': digest(tool(runtime, 'dolrecomp')),
                 'runner': digest(tool(runtime, 'moderngekko-run')),
-                'host': platform.machine(), 'compiler': compiler}
+                'host': platform.machine(), 'compiler': compiler, 'codegen': codegen}
     if args.experimental_rel:
         identity['rel'] = rel_layout
     key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:32]

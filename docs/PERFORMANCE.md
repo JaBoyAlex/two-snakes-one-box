@@ -624,6 +624,33 @@ Four order-reversed 20-second replays compared the packaged dev.46 and dev.47 ru
 
 Two runs per CPU mode reversed the run order with the Null backend and audio disabled. JIT-only advanced at 99.7–99.9% of real time with zero of 161 samples below 95%. Hybrid advanced at 91.5–94.9% with 55 of 162 samples below 95%. Its median speed still rounded to 100% in both runs. The 486 MHz throttle limit stayed constant in all eight replays, and all exited normally. The Null replays isolate a repeatable slowdown in the hybrid execution path at this checkpoint. A matched guest-tick CPU profile can locate the cost before the next optimization.
 
+#### CPU work during the final pursuit
+
+A dev.47 symbol build replayed the same checkpoint with the Null backend and audio output disabled. The table measures CPU time on the shared CPU and video thread per second of emulated time.
+
+| Guest clock interval | JIT-only | Hybrid |
+| --- | ---: | ---: |
+| 284–290 s | 517 ms | 641 ms |
+| 296–302 s | 656 ms | 951 ms |
+| 284–305 s | 561 ms | 799 ms |
+
+A six-second instruction-pointer capture near the later section placed 94 of 383 hybrid samples in the native module, 24 in the native execution loop, and 19 in register synchronization. The Null backend still ran graphics processing on the shared thread. Framebuffer decoding and hashing appeared in both profiles. Sample proportions include time waiting in the operating system.
+
+Two private C module builds used the same boot executable and covered the same 97,360 guest instruction positions. Building with `DOLRECOMP_C_CHUNK_INSTRUCTIONS=1024` increased the number of chunks from 25 to 96 and reduced the native code section from 7.66 to 6.37 MiB. One clean build of each symbol-enabled module took about 94 seconds with smaller chunks and 222 seconds with the original chunks. Those times cover compilation and linking on five workers.
+
+Four order-reversed 23-second Null replays used the same dev.47 runner. Across the common 19.836 emulated seconds, the smaller chunks used 957–961 ms of thread CPU time per emulated second. The reference used 994–1,020 ms. Whole-replay guest-clock rates rose from 86.7–88.6% to 90.9–91.5% of real time. All four runs used the original throttle limit and exited normally.
+
+A separate pair of replays generated 19.951 seconds of sample-identical guest DSP output. The disc-audio streams contained only silence in both runs.
+
+Four 30-second runs repeated the comparison with 4× Vulkan, accurate framebuffer copies, and normal Cubeb output at 5% test volume. The window opened on the secondary display. Across 24.391 matched guest seconds, the 1,024-instruction build used 774–822 ms of thread CPU time per emulated second and the reference used 828–970 ms. Full-interval guest-clock progression was 93.2–97.3% with smaller chunks and 81.4–93.6% with the reference. The smaller chunks produced 70 of 242 samples below 95% game speed. The reference produced 136 of 240. The smaller-chunk runs still had a vertical blank gap of 105.66 ms at worst. All four runs exited normally and each 24-second audio capture reported zero packet discontinuities or timestamp gaps above 2 ms.
+
+The same two modules ran two 17-second Null replays each in Heliport and Tower A. Each pair reversed the build order and shut down normally.
+
+| Checkpoint | Original chunk CPU time per guest second | Smaller chunk CPU time per guest second | Original / smaller chunk guest-clock rate |
+| --- | ---: | ---: | ---: |
+| Heliport | 871–895 ms | 858–867 ms | 99.5–100.7% / 99.8–100.9% |
+| Tower A | 1,069–1,128 ms | 1,040–1,052 ms | 85.7–89.8% / 93.2–94.9% |
+
 ### Dev.35 Disc 1 boss replays
 
 Three isolated dev.34 launches loaded the Tank, Ninja and first Sniper Wolf fights from USA Very Easy practice saves. Each encounter responded to scripted analog input and preserved its memory-card save. [Practice-save source](https://www.speedrun.com/mgstts/resources)
