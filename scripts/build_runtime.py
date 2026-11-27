@@ -58,6 +58,7 @@ PATCH_PREREQUISITES = {
     'recompcore-win32-focus-speed.patch': ('recompcore-twin-snakes-controller-port.patch',),
     'recompcore-win32-title-queue.patch': ('recompcore-win32-focus-speed.patch',),
     'recompcore-win32-monitor-position.patch': ('recompcore-win32-title-queue.patch',),
+    'recompcore-win32-display-selection.patch': ('recompcore-win32-monitor-position.patch',),
     'recompcore-fixed-range-linking.patch': ('recompcore-fallback-linking.patch',),
     'recompcore-fixed-dispatch-bounds.patch': ('recompcore-fixed-range-linking.patch',),
     'recompcore-trim-native-chunk-lookup.patch': ('recompcore-verified-virtual-code.patch',),
@@ -118,7 +119,7 @@ def main():
     apply_patch(source, 'moderngekko-automation-throttle-clock.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-empty-gamepad-config.patch')
-    apply_patch(source / 'vendor/dolphin', 'recompcore-win32-monitor-position.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-win32-display-selection.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-throttle-clock.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-fastmem.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fixed-dispatch-bounds.patch')

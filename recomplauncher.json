@@ -96,12 +96,21 @@
           "path": "{data}/user/Config/GFX.ini"
         }
       ]
+    },
+    {
+      "id": "window",
+      "format": "ini",
+      "file": [
+        {
+          "path": "{data}/user/Config/Dolphin.ini"
+        }
+      ]
     }
   ],
   "settings": [
     {
       "id": "display",
-      "label": "Display",
+      "label": "Display mode",
       "group": "Video",
       "help": "Automatic opens in fullscreen from Big Picture and in a window from the desktop. Borderless fullscreen uses the monitor's desktop resolution.",
       "defaults": {
@@ -124,6 +133,54 @@
           "label": "Borderless fullscreen",
           "set": {
             "fullscreen": "true"
+          }
+        }
+      ]
+    },
+    {
+      "id": "monitor",
+      "label": "Monitor",
+      "group": "Video",
+      "in": "window",
+      "help": "Choose where the game opens on Windows. Default display uses your Windows primary display. Changes apply the next time you launch the game.",
+      "defaults": {
+        "Display/RenderWindowMonitor": "primary"
+      },
+      "choices": [
+        {
+          "label": "Default display",
+          "set": {
+            "Display/RenderWindowMonitor": "primary"
+          }
+        },
+        {
+          "label": "Display 1",
+          "set": {
+            "Display/RenderWindowMonitor": "DISPLAY1"
+          }
+        },
+        {
+          "label": "Display 2",
+          "set": {
+            "Display/RenderWindowMonitor": "DISPLAY2"
+          }
+        },
+        {
+          "label": "Display 3",
+          "set": {
+            "Display/RenderWindowMonitor": "DISPLAY3"
+          }
+        },
+        {
+          "label": "Display 4",
+          "set": {
+            "Display/RenderWindowMonitor": "DISPLAY4"
+          }
+        },
+        {
+          "label": "Last used display",
+          "set": {
+            "Display/RenderWindowMonitor": "last"
           }
         }
       ]

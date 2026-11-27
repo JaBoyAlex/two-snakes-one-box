@@ -43,7 +43,8 @@ class BenchmarkTests(unittest.TestCase):
                 self.assertIn(f'[Hacks]\nXFBToTextureEnable = {texture_only}', graphics)
                 dolphin = (work / 'user/Config/Dolphin.ini').read_text()
                 self.assertIn('[DSP]\nVolume = 5\n', dolphin)
-                self.assertIn('[Display]\nRenderWindowXPos = -1500\nRenderWindowYPos = 660\n', dolphin)
+                self.assertIn('[Display]\nRenderWindowXPos = -1500\nRenderWindowYPos = 660\n'
+                              'RenderWindowMonitor = last\n', dolphin)
                 summary = json.loads((work / 'summary.json').read_text())
                 self.assertEqual(summary['xfb_copies_requested'], mode)
 

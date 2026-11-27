@@ -49,7 +49,11 @@ The Windows dev.21 runtime reads the Direct3D 11 choice from RecompLauncher’s 
 
 Use `--window-position X Y` with `scripts/benchmark_boot.py --windowed` to select a starting point on the Windows desktop. Monitors to the left of or above the primary display use negative coordinates. With `--fullscreen`, the runner uses the bounds of the monitor containing that point.
 
-The display setting `fullscreen=auto` follows the launcher mode at each start. Big Picture uses borderless fullscreen and desktop mode opens a window. Explicit `true` and `false` override that behavior. The separate `resolution=auto` option chooses an integer internal scale from the output area. Existing resolution values such as `640x528` and `2560x1440` still select fixed scales.
+In RecompLauncher, **Game Settings → Video → Display mode** defaults to **Automatic** (`fullscreen=auto`). Big Picture opens borderless fullscreen and desktop mode opens a window. **Window** and **Borderless fullscreen** apply the selected mode in either launcher view.
+
+**Game Settings → Video → Monitor** defaults to the Windows primary display. Choose a numbered display to open there at the next launch, or **Last used display** to restore the last windowed position on a connected monitor. If the chosen display is unavailable when the game starts, it opens on the primary display and keeps your selection for the next launch. Borderless fullscreen uses the desktop resolution of the display it occupies.
+
+**Internal resolution** controls the GameCube render scale. The `resolution=auto` option chooses an integer scale from the output area. Values such as `640x528` and `2560x1440` select fixed scales.
 
 The launcher allows one visible game per user across package folders. Setup and headless diagnostics use the lock for their own data directory. Close a running game before opening another package for interactive play.
 

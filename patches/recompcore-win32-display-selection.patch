@@ -1,0 +1,191 @@
+diff --git a/Source/Core/DolphinNoGUI/PlatformWin32.cpp b/Source/Core/DolphinNoGUI/PlatformWin32.cpp
+--- a/Source/Core/DolphinNoGUI/PlatformWin32.cpp
++++ b/Source/Core/DolphinNoGUI/PlatformWin32.cpp
+@@ -45,6 +45,32 @@
+ constexpr UINT ID_LOAD_STATE_LAST = 41199;
+ constexpr UINT WM_UPDATE_WINDOW_TITLE = WM_APP + 1;
+ 
++const Config::Info<std::string> RENDER_WINDOW_MONITOR{
++    {Config::System::Main, "Display", "RenderWindowMonitor"}, "primary"};
++
++HMONITOR FindNamedMonitor(const std::string& selection)
++{
++  struct Search
++  {
++    std::wstring device;
++    HMONITOR match = nullptr;
++  };
++  Search search{L"\\\\.\\" + UTF8ToWString(selection)};
++  EnumDisplayMonitors(
++      nullptr, nullptr,
++      [](HMONITOR display, HDC, LPRECT, LPARAM data) -> BOOL {
++        auto& search = *reinterpret_cast<Search*>(data);
++        MONITORINFOEXW info{};
++        info.cbSize = sizeof(info);
++        if (!GetMonitorInfoW(display, &info) || search.device != info.szDevice)
++          return TRUE;
++        search.match = display;
++        return FALSE;
++      },
++      reinterpret_cast<LPARAM>(&search));
++  return search.match;
++}
++
+ // Hold-to-fast-forward target. 2x is fast enough to skip a cutscene without
+ // outrunning what most hosts can actually emulate.
+ constexpr float FAST_FORWARD_SPEED = 2.0f;
+@@ -60,6 +86,7 @@
+   void MainLoop() override;
+ 
+   WindowSystemInfo GetWindowSystemInfo() const override;
++  void SaveWindowGeometry() override;
+ 
+ private:
+   static constexpr TCHAR WINDOW_CLASS_NAME[] = _T("DolphinNoGUI");
+@@ -93,11 +120,7 @@
+   LONG m_windowed_style = 0;
+   LONG m_windowed_ex_style = 0;
+   RECT m_windowed_rect{};
+-
+-  int m_window_x = Config::Get(Config::MAIN_RENDER_WINDOW_XPOS);
+-  int m_window_y = Config::Get(Config::MAIN_RENDER_WINDOW_YPOS);
+-  int m_window_width = Config::Get(Config::MAIN_RENDER_WINDOW_WIDTH);
+-  int m_window_height = Config::Get(Config::MAIN_RENDER_WINDOW_HEIGHT);
++  std::optional<RECT> m_last_normal_rect;
+ };
+ 
+ PlatformWin32::~PlatformWin32()
+@@ -140,14 +163,43 @@
+ 
+ bool PlatformWin32::CreateRenderWindow()
+ {
+-  // Monitors to the left of or above the primary display have negative coordinates.
+-  const bool has_saved_position = m_window_x != -1 || m_window_y != -1;
+-  const bool position_on_monitor =
+-      has_saved_position && MonitorFromPoint({m_window_x, m_window_y}, MONITOR_DEFAULTTONULL);
++  const POINT saved{Config::Get(Config::MAIN_RENDER_WINDOW_XPOS),
++                    Config::Get(Config::MAIN_RENDER_WINDOW_YPOS)};
++  const HMONITOR saved_monitor =
++      saved.x != -1 || saved.y != -1 ? MonitorFromPoint(saved, MONITOR_DEFAULTTONULL) : nullptr;
++  const std::string selection = Config::Get(RENDER_WINDOW_MONITOR);
++  HMONITOR display = nullptr;
++  if (selection == "last")
++    display = saved_monitor;
++  else if (selection.starts_with("DISPLAY"))
++    display = FindNamedMonitor(selection);
++  if (!display)
++    display = MonitorFromPoint({0, 0}, MONITOR_DEFAULTTOPRIMARY);
++
++  LONG x = CW_USEDEFAULT;
++  LONG y = CW_USEDEFAULT;
++  LONG width = Config::Get(Config::MAIN_RENDER_WINDOW_WIDTH);
++  LONG height = Config::Get(Config::MAIN_RENDER_WINDOW_HEIGHT);
++  MONITORINFO monitor{};
++  monitor.cbSize = sizeof(monitor);
++  if (GetMonitorInfo(display, &monitor))
++  {
++    const RECT& work = monitor.rcWork;
++    width = std::clamp(width, 1L, std::max(1L, work.right - work.left));
++    height = std::clamp(height, 1L, std::max(1L, work.bottom - work.top));
++    if (saved_monitor == display)
++    {
++      x = std::clamp(saved.x, work.left, std::max(work.left, work.right - width));
++      y = std::clamp(saved.y, work.top, std::max(work.top, work.bottom - height));
++    }
++    else
++    {
++      x = work.left + (work.right - work.left - width) / 2;
++      y = work.top + (work.bottom - work.top - height) / 2;
++    }
++  }
+   m_hwnd = CreateWindowEx(WS_EX_CLIENTEDGE, WINDOW_CLASS_NAME, _T("Dolphin"), WS_OVERLAPPEDWINDOW,
+-                          position_on_monitor ? m_window_x : CW_USEDEFAULT,
+-                          position_on_monitor ? m_window_y : CW_USEDEFAULT, m_window_width,
+-                          m_window_height, nullptr, nullptr, GetModuleHandle(nullptr), this);
++                          x, y, width, height, nullptr, nullptr, GetModuleHandle(nullptr), this);
+   if (!m_hwnd)
+   {
+     MessageBox(nullptr, _T("CreateWindowEx failed."), _T("Error"), MB_ICONERROR | MB_OK);
+@@ -311,12 +363,13 @@
+   if (!GetWindowRect(m_hwnd, &m_windowed_rect))
+     return;
+ 
++  UpdateWindowPosition();
+   m_windowed_style = GetWindowLong(m_hwnd, GWL_STYLE);
+   m_windowed_ex_style = GetWindowLong(m_hwnd, GWL_EXSTYLE);
++  m_window_fullscreen.store(true, std::memory_order_relaxed);
+   SetMenu(m_hwnd, nullptr);
+   SetWindowLong(m_hwnd, GWL_STYLE, m_windowed_style & ~WS_OVERLAPPEDWINDOW);
+   SetWindowLong(m_hwnd, GWL_EXSTYLE, m_windowed_ex_style & ~WS_EX_CLIENTEDGE);
+-  m_window_fullscreen.store(true, std::memory_order_relaxed);
+   if (!FitToMonitor(MonitorFromWindow(m_hwnd, MONITOR_DEFAULTTONEAREST)))
+   {
+     RestoreWindowed();
+@@ -331,13 +384,13 @@
+   if (!RegisterRenderWindowClass() || !CreateRenderWindow() || !CreateMenus())
+     return false;
+ 
++  UpdateWindowPosition();
+   if (Config::Get(Config::MAIN_FULLSCREEN))
+     ToggleFullscreen();
+ 
+   if (Config::Get(Config::MAIN_DISABLE_SCREENSAVER))
+     SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED);
+ 
+-  UpdateWindowPosition();
+   return true;
+ }
+ 
+@@ -363,7 +416,6 @@
+     UpdateRunningFlag();
+     Core::HostDispatchJobs(Core::System::GetInstance());
+     ProcessEvents();
+-    UpdateWindowPosition();
+ 
+     // TODO: Is this sleep appropriate?
+     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+@@ -381,17 +433,26 @@
+ 
+ void PlatformWin32::UpdateWindowPosition()
+ {
+-  if (IsWindowFullscreen())
++  if (!m_hwnd || IsWindowFullscreen() || IsIconic(m_hwnd) || IsZoomed(m_hwnd))
+     return;
+ 
+   RECT rc = {};
+-  if (!GetWindowRect(m_hwnd, &rc))
+-    return;
+-
+-  m_window_x = rc.left;
+-  m_window_y = rc.top;
+-  m_window_width = rc.right - rc.left;
+-  m_window_height = rc.bottom - rc.top;
++  if (GetWindowRect(m_hwnd, &rc))
++    m_last_normal_rect = rc;
++}
++
++void PlatformWin32::SaveWindowGeometry()
++{
++  UpdateWindowPosition();
++  if (!m_last_normal_rect)
++    return;
++
++  const RECT& rc = *m_last_normal_rect;
++  const Config::ConfigChangeCallbackGuard guard;
++  Config::SetBase(Config::MAIN_RENDER_WINDOW_XPOS, rc.left);
++  Config::SetBase(Config::MAIN_RENDER_WINDOW_YPOS, rc.top);
++  Config::SetBase(Config::MAIN_RENDER_WINDOW_WIDTH, rc.right - rc.left);
++  Config::SetBase(Config::MAIN_RENDER_WINDOW_HEIGHT, rc.bottom - rc.top);
+ }
+ 
+ void PlatformWin32::ProcessEvents()
+@@ -444,6 +505,9 @@
+       SetWindowTextW(hwnd, title->c_str());
+     return 0;
+   }
++  case WM_WINDOWPOSCHANGED:
++    platform->UpdateWindowPosition();
++    return DefWindowProc(hwnd, msg, wParam, lParam);
+   case WM_SIZE:
+   {
+     if (g_presenter)

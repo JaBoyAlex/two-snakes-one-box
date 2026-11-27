@@ -89,7 +89,8 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
         dolphin_settings += '[DSP]\nVolume = 5\n'
         if window_position is not None:
             x, y = window_position
-            dolphin_settings += f'[Display]\nRenderWindowXPos = {x}\nRenderWindowYPos = {y}\n'
+            dolphin_settings += (f'[Display]\nRenderWindowXPos = {x}\nRenderWindowYPos = {y}\n'
+                                 'RenderWindowMonitor = last\n')
     if dolphin_settings:
         (config / 'Dolphin.ini').write_text(dolphin_settings, encoding='ascii')
     interval_logs = {}
