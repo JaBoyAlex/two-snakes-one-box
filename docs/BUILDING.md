@@ -53,7 +53,7 @@ Use `--window-position X Y` with `scripts/benchmark_boot.py --windowed` to selec
 
 In RecompLauncher, **Game Settings → Video → Display mode** defaults to **Automatic** (`fullscreen=auto`). Big Picture opens borderless fullscreen and desktop mode opens a window. **Window** and **Borderless fullscreen** apply the selected mode in either launcher view.
 
-**Game Settings → Video → Monitor** defaults to the Windows primary display. Choose a numbered display to open there at the next launch, or **Last used display** to restore the last windowed position on a connected monitor. If the chosen display is unavailable when the game starts, it opens on the primary display and keeps your selection for the next launch. Borderless fullscreen uses the desktop resolution of the display it occupies.
+**Game Settings → Video → Monitor** preselects **Default display**, which uses the Windows primary display. Choose a numbered display or select **Last used display** to restore the last windowed position on a connected monitor. Changes take effect the next time you launch the game. If the chosen display is unavailable at startup, the game opens on the primary display and keeps your selection. Borderless fullscreen uses the desktop resolution of the display it occupies.
 
 **Internal resolution** controls the GameCube render scale. The `resolution=auto` option chooses an integer scale from the output area. Values such as `640x528` and `2560x1440` select fixed scales.
 
