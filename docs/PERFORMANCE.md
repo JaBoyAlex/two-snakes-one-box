@@ -817,6 +817,14 @@ A clean build of the same generated boot module on the bundled x64 toolchain too
 
 Four order-reversed 54-second flashback replays at 4× Direct3D 11 reached 100% median game speed. ThinLTO recorded 27 of 434 samples below 95% speed and the no-IPO build recorded 40 of 434. Individual repeats varied. Four 25-second Tower A replays under the same settings also reached 100% median game speed, with zero of 404 samples below 95%. The setup build retains ThinLTO while gameplay pacing takes priority over the measured one-time build savings.
 
+### Dev.54 windowed audio and native load trial
+
+The dev.54 packaged runtime replayed Tower A at 4× Vulkan and the Underground Passage flashback at 4× Direct3D 11 with shared CPU and video threads and Cubeb. The windows used Display 2 and a private 5% test volume. Tower A held 100% median game speed over 34 seconds, with zero of 136 samples below 95%. The 55-second cold flashback had 23 of 220 samples below 95% and a maximum vertical blank interval of 259.86 ms. Warm controls at 4× and 1× had 30 and 21 slow samples respectively. The opt-in 4× vector route had 10 slow samples and a 143.37 ms maximum vertical blank interval. The captures reported zero audio packet discontinuities or valid timestamp gaps above 2 ms. These tests used one Windows machine. The longer flashback intervals remain open.
+
+A private SDK trial loaded both unquantized paired-single lanes in one read when the entire eight-byte range was in guest RAM. The existing per-lane path handled external memory, boundary crossings, single-lane loads and quantized or disabled instructions. A synthetic comparison matched both result lanes and callback counts in 800,035 cases.
+
+Four order-reversed 55-second replays compared native modules from the same generated input and pinned compiler at 4× Direct3D 11. Across 50.470 seconds of matched guest time, the trial used 998.20 and 996.34 ms of process CPU time per guest second. The controls used 998.48 and 985.34 ms. The candidate had 41 of 439 samples below 95%, compared with 66 of 440 for the controls. All four Windows captures reported zero audio discontinuities. The two matched guest DSP comparisons were sample-identical for 57.401 and 58.157 seconds. The CPU savings did not repeat across run orders, so the load change stayed private.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.

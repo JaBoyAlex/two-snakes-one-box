@@ -125,21 +125,25 @@ class PrepareTests(unittest.TestCase):
         self.assertEqual(repaired, current / 'disc1')
         self.assertEqual((repaired / 'sys/main.dol').read_bytes(), b'test DOL')
 
-    def test_prepare_pins_codegen_and_records_it_in_the_cache_identity(self):
+    def test_prepare_records_codegen_and_sdk_in_the_cache_identity(self):
         inputs = [self.root / name for name in ('disc1.iso', 'disc2.iso')]
         for disc in inputs:
             disc.write_bytes(disc.name.encode())
         for name in ('dependencies.lock.json', 'dolrecomp', 'moderngekko-run'):
             (self.root / name).write_bytes(name.encode())
+        header = self.root / 'sdk' / 'GXRuntime' / 'include' / 'core' / 'cpu.h'
+        header.parent.mkdir(parents=True)
         self.disc.revision = 0
         self.disc.record = lambda: {'dol_sha256': self.disc.dol_sha256}
         profile = {'dol_sha256': self.disc.dol_sha256, 'rel': {'format': 1},
                    'discs': [{'sha256': twin_snakes.digest(disc)} for disc in inputs]}
         chunk = 'DOLRECOMP_C_CHUNK_INSTRUCTIONS'
         lookup = 'DOLRECOMP_DISPATCH_LOOKUP'
-        build_keys = set()
-        for experimental, size in ((False, '1024'), (True, '4096')):
-            with self.subTest(experimental=experimental):
+        builds = []
+        for experimental, size, contents in ((False, '1024', b'old'), (True, '4096', b'old'),
+                                             (False, '1024', b'new')):
+            with self.subTest(experimental=experimental, sdk=contents):
+                header.write_bytes(contents)
                 args = SimpleNamespace(disc1=inputs[0], disc2=inputs[1], inspect=False,
                                        experimental_rel=experimental)
                 env = {chunk: '128', lookup: 'indexed'}
@@ -156,8 +160,10 @@ class PrepareTests(unittest.TestCase):
                 self.assertEqual(build.call_args.args[4], expected)
                 record = twin_snakes.read_prepared_record(self.root / 'prepared.json')
                 self.assertEqual(record['identity']['codegen'], expected)
-                build_keys.add(build.call_args.args[2])
-        self.assertEqual(len(build_keys), 2)
+                builds.append((build.call_args.args[2], record['identity']['sdk']))
+        self.assertEqual(len({key for key, _ in builds}), 3)
+        self.assertEqual(builds[0][1], builds[1][1])
+        self.assertNotEqual(builds[0][1], builds[2][1])
 
     def test_link_retry_does_not_reuse_partial_native_output(self):
         extracted = self.build / 'disc1'

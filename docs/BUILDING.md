@@ -15,7 +15,7 @@ python app/twin_snakes.py
 
 The builder writes private disc-derived files under the chosen data directory. For a development checkout, use `--data .local/player`. Use `--runtime PATH` to select a staged open-source runtime; the default development location is `.local/runtime`.
 
-Setup can reuse extracted disc directories across runner updates when the normalized disc hashes and extractor hash match. It checks each cached boot executable and gameplay module before reuse. Running setup again re-extracts a missing or damaged disc cache from the verified image. The compiled native module is reused only if it matches the SHA-256 recorded at link completion. An older install with an empty completion record rebuilds once when setup is run again. Save files and settings live under the separate `user` directory.
+Setup can reuse extracted disc directories across runner updates when the normalized disc hashes and extractor hash match. It checks each cached boot executable and gameplay module before reuse. Running setup again re-extracts a missing or damaged disc cache from the verified image. An SDK change rebuilds the native module using the verified extraction. Setup checks a reused native module against the SHA-256 recorded at link completion. An older install with an empty completion record rebuilds once when setup is run again. Save files and settings live under the separate `user` directory.
 
 The development builder uses 1,024-instruction chunks for the shared boot module. Setup records code-generation options in the build identity. It can build a new module from previously verified extractions when those options change. The experimental full REL build uses 4,096-instruction chunks.
 

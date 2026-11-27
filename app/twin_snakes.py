@@ -32,6 +32,12 @@ def digest(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
+def sdk_digest(sdk):
+    files = {path.relative_to(sdk).as_posix(): digest(path)
+             for path in sdk.rglob('*') if path.is_file()}
+    return hashlib.sha256(json.dumps(files, sort_keys=True).encode('utf-8')).hexdigest()
+
+
 def file_matches(path, expected):
     return path.is_file() and digest(path) == expected
 
@@ -374,6 +380,7 @@ def prepare(args, runtime, data, log):
     env.update(codegen)
     identity = {'format': BUILD_FORMAT, 'discs': disc_hashes,
                 'runtime': digest(runtime / 'dependencies.lock.json'),
+                'sdk': sdk_digest(runtime / 'sdk'),
                 'recompiler': digest(tool(runtime, 'dolrecomp')),
                 'runner': digest(tool(runtime, 'moderngekko-run')),
                 'host': platform.machine(), 'compiler': compiler, 'codegen': codegen}
