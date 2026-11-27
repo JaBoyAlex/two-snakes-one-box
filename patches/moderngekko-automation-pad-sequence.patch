@@ -1,0 +1,234 @@
+diff --git a/tools/automation_protocol.hpp b/tools/automation_protocol.hpp
+--- a/tools/automation_protocol.hpp
++++ b/tools/automation_protocol.hpp
+@@ -16,6 +16,7 @@
+   Pad,
+   PadFrames,
+   PadFields,
++  PadSequence,
+   ClearPad,
+   Pause,
+   Resume,
+@@ -35,6 +36,12 @@
+       controls{};
+ };
+ 
++struct PadFieldHold
++{
++  PadState pad;
++  std::uint32_t fields = 0;
++};
++
+ struct Command
+ {
+   CommandType type = CommandType::Pause;
+@@ -44,6 +51,7 @@
+   std::uint32_t address = 0;
+   std::uint32_t size = 0;
+   std::uint32_t duration = 0;
++  std::vector<PadFieldHold> pad_sequence;
+   std::vector<std::uint8_t> data;
+ };
+ 
+diff --git a/tools/automation_protocol.cpp b/tools/automation_protocol.cpp
+--- a/tools/automation_protocol.cpp
++++ b/tools/automation_protocol.cpp
+@@ -159,6 +159,8 @@
+     return CommandType::PadFrames;
+   if (text == "pad_fields")
+     return CommandType::PadFields;
++  if (text == "pad_sequence")
++    return CommandType::PadSequence;
+   if (text == "clear_pad")
+     return CommandType::ClearPad;
+   if (text == "pause")
+@@ -292,6 +294,70 @@
+   return true;
+ }
+ 
++bool ParsePadSequence(const std::map<std::string, std::string>& values, Command* command,
++                      std::string* error)
++{
++  constexpr std::string_view prefix = "step.";
++  const auto port = values.find("port");
++  if (port == values.end())
++  {
++    if (error)
++      *error = "pad_sequence requires port=0..3";
++    return false;
++  }
++
++  std::map<std::uint32_t, std::map<std::string, std::string>> steps;
++  for (const auto& [key, value] : values)
++  {
++    if (key == "command" || key == "port")
++      continue;
++
++    const auto dot = key.find('.', prefix.size());
++    const auto number = key.starts_with(prefix) && dot != std::string::npos ?
++                            ParseUnsigned(std::string_view(key).substr(prefix.size(), dot - prefix.size())) :
++                            std::nullopt;
++    const auto field = dot == std::string::npos ? std::string{} : key.substr(dot + 1);
++    if (!number || *number == 0 || *number > 1024 ||
++        key.substr(prefix.size(), dot - prefix.size()) != std::to_string(*number) ||
++        (field != "fields" && !FindPadField(field)))
++    {
++      if (error)
++        *error = "invalid pad_sequence key: " + key;
++      return false;
++    }
++    steps[*number].emplace(field, value);
++  }
++
++  if (steps.empty() || steps.rbegin()->first != steps.size())
++  {
++    if (error)
++      *error = "pad_sequence steps must be numbered consecutively from 1";
++    return false;
++  }
++
++  std::uint32_t total = 0;
++  for (auto& [number, fields] : steps)
++  {
++    fields.emplace("port", port->second);
++    Command hold;
++    if (!ParsePadCommand(fields, &hold, "fields", error))
++    {
++      if (error)
++        *error = "pad_sequence step " + std::to_string(number) + ": " + *error;
++      return false;
++    }
++    total += hold.duration;
++    if (total > 36000)
++    {
++      if (error)
++        *error = "pad_sequence cannot exceed 36000 fields";
++      return false;
++    }
++    command->pad_sequence.push_back({hold.pad, hold.duration});
++  }
++  return true;
++}
++
+ bool ParseReadMemoryCommand(const std::map<std::string, std::string>& values, Command* command,
+                             std::string* error)
+ {
+@@ -464,6 +530,10 @@
+     break;
+   case CommandType::PadFields:
+     if (!ParsePadCommand(values, &parsed, "fields", error))
++      return false;
++    break;
++  case CommandType::PadSequence:
++    if (!ParsePadSequence(values, &parsed, error))
+       return false;
+     break;
+   case CommandType::ClearPad:
+diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
+--- a/src/runtime/dolphin_runtime.cpp
++++ b/src/runtime/dolphin_runtime.cpp
+@@ -326,24 +326,36 @@
+     break;
+   }
+   case automation::CommandType::PadFields:
++  case automation::CommandType::PadSequence:
+   {
+     if (Core::GetState(system) != Core::State::Running)
+     {
+       return RuntimeError{RuntimeErrorCode::InvalidState,
+-                          "pad_fields requires a running emulated core"};
+-    }
++                          "field-timed input requires a running emulated core"};
++    }
++    const automation::PadFieldHold single{command.pad, command.duration};
++    const bool is_sequence = command.type == automation::CommandType::PadSequence;
++    const auto* holds = is_sequence ? command.pad_sequence.data() : &single;
++    const std::size_t hold_count = is_sequence ? command.pad_sequence.size() : 1;
++    const int port = holds[0].pad.port;
+     std::atomic<bool> completed{false};
+-    std::uint32_t elapsed_fields = 0;
++    std::size_t step = 0;
++    std::uint32_t fields_remaining = 0;
+     auto field_hook = GetVideoEvents().vi_end_field_event.Register([&] {
+       if (completed.load(std::memory_order_relaxed))
+         return;
+-      if (elapsed_fields == 0)
+-        ApplyAutomationPad(command.pad);
+-      if (elapsed_fields++ == command.duration)
++      if (fields_remaining == 0)
+       {
+-        ClearAutomationPad(command.pad.port);
+-        completed.store(true, std::memory_order_relaxed);
++        if (step == hold_count)
++        {
++          ClearAutomationPad(port);
++          completed.store(true, std::memory_order_relaxed);
++          return;
++        }
++        ApplyAutomationPad(holds[step].pad);
++        fields_remaining = holds[step++].fields;
+       }
++      --fields_remaining;
+     });
+     while (!completed.load(std::memory_order_relaxed) && !stop_token.stop_requested() &&
+            Core::GetState(system) == Core::State::Running)
+@@ -353,8 +365,8 @@
+     field_hook.reset();
+     if (!completed.load(std::memory_order_relaxed))
+     {
+-      Core::RunOnCPUThread(system, [port = command.pad.port] { ClearAutomationPad(port); });
+-      return RuntimeError{RuntimeErrorCode::InvalidState, "pad_fields was interrupted"};
++      Core::RunOnCPUThread(system, [port] { ClearAutomationPad(port); });
++      return RuntimeError{RuntimeErrorCode::InvalidState, "field-timed input was interrupted"};
+     }
+     break;
+   }
+@@ -428,6 +440,7 @@
+   case automation::CommandType::WriteMemory:
+   case automation::CommandType::PadFrames:
+   case automation::CommandType::PadFields:
++  case automation::CommandType::PadSequence:
+   case automation::CommandType::ChangeDisc:
+     return true;
+   case automation::CommandType::Pad:
+diff --git a/tests/automation_protocol_test.cpp b/tests/automation_protocol_test.cpp
+--- a/tests/automation_protocol_test.cpp
++++ b/tests/automation_protocol_test.cpp
+@@ -206,6 +206,37 @@
+     return 16;
+   }
+ 
++  {
++    std::ofstream output(commands / "011_pad_sequence.txt");
++    output << "command=pad_sequence\nport=2\n"
++           << "step.3.fields=4\nstep.3.main_x=-0.5\n"
++           << "step.1.fields=6\nstep.1.main_y=1\n"
++           << "step.2.fields=3\n";
++  }
++  if (!automation::ParseCommandFile(commands / "011_pad_sequence.txt", &command, &error) ||
++      command.type != automation::CommandType::PadSequence || command.pad_sequence.size() != 3 ||
++      command.pad_sequence[0].fields != 6 || command.pad_sequence[0].pad.port != 2 ||
++      command.pad_sequence[0].pad.controls[15] != 1.0 || command.pad_sequence[1].fields != 3 ||
++      command.pad_sequence[1].pad.controls[15] != 0.0 || command.pad_sequence[2].fields != 4 ||
++      command.pad_sequence[2].pad.controls[14] != -0.5)
++  {
++    return 17;
++  }
++
++  for (const auto* invalid : {"step.2.fields=1\n", "step.1.port=3\nstep.1.fields=1\n",
++                              "step.1.a=1\n", "step.1.fields=1\nstep.1.main_x=2\n",
++                              "step.1.fields=36000\nstep.2.fields=1\n"})
++  {
++    const auto path = commands / "012_bad_pad_sequence.txt";
++    {
++      std::ofstream output(path);
++      output << "command=pad_sequence\nport=0\n" << invalid;
++    }
++    error.clear();
++    if (automation::ParseCommandFile(path, &command, &error) || error.empty())
++      return 18;
++  }
++
+   std::error_code ec;
+   std::filesystem::remove_all(root, ec);
+   return 0;

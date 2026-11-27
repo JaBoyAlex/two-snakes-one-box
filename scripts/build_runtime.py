@@ -52,6 +52,7 @@ PATCH_PREREQUISITES = {
     'moderngekko-skip-duplicate-game-inspection.patch': ('moderngekko-disc-pair.patch',),
     'moderngekko-cache-asset-relative-paths.patch': ('moderngekko-windows-asset-hash.patch',),
     'moderngekko-automation-throttle-clock.patch': ('moderngekko-automation-guest-ticks.patch',),
+    'moderngekko-automation-pad-sequence.patch': ('moderngekko-automation-pad-fields.patch',),
     'recompcore-gamepad-bindings.patch': ('recompcore-auto-gamepad.patch',),
     'recompcore-win32-fullscreen.patch': ('recompcore-win32-window-teardown.patch',),
     'recompcore-twin-snakes-controller-port.patch': ('recompcore-win32-fullscreen.patch',),
@@ -114,7 +115,7 @@ def main():
     apply_patch(source, 'moderngekko-cache-asset-relative-paths.patch')
     apply_patch(source, 'moderngekko-automation-load-result.patch')
     apply_patch(source, 'moderngekko-automation-present-count.patch')
-    apply_patch(source, 'moderngekko-automation-pad-fields.patch')
+    apply_patch(source, 'moderngekko-automation-pad-sequence.patch')
     apply_patch(source, 'moderngekko-twin-snakes-xfb-default.patch')
     apply_patch(source, 'moderngekko-automation-throttle-clock.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch')

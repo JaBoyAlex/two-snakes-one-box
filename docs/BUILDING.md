@@ -65,6 +65,18 @@ The runtime’s debug automation reports `load_state` as processed after the CPU
 
 For timing comparisons with a source-built runner, `command=pad_fields` holds controller input for the requested number of emulated video fields. Supply `port`, `fields` and any controls you want to hold. The hold starts at the next field boundary, and the command completes after the last field. `pad_frames` remains available for scripts timed to newly drawn frames.
 
+Use `pad_sequence` when a replay needs several consecutive holds. Each step replaces the previous controller state at a guest video field boundary. A step with only `fields` supplies neutral input. Number steps from 1 without gaps. The runner validates the entire command before applying it and clears the input override after the last step. Each command supports up to 1,024 steps and 36,000 fields total.
+
+```ini
+command=pad_sequence
+port=0
+step.1.fields=120
+step.1.main_y=0.75
+step.2.fields=20
+step.3.fields=6
+step.3.y=1
+```
+
 The automation status reports `guest_ticks` and `throttle_clock_hz` from emulated video fields. The throttle clock is the active limit in guest cycles per host second. A value of zero after fields have advanced means the limiter is disabled. A save-state load restores the guest clock, so `guest_ticks` can decrease across a load. For comparable replays, start from the same checkpoint and align the benchmark samples by `guest_ticks`. The benchmark keeps host time, new draws and presentation callbacks in each sample, and includes the throttle rate when the runner reports it. For a continuous guest clock, it also reports `guest_ticks_per_host_second` over the sampled interval. Normal GameCube progression is about 486 million ticks per host second.
 
 Dev.37 enables **Codec and Photo Album accuracy** by default for standalone and RecompLauncher profiles without a saved choice. If you previously turned it off, turn it back on under the launcher's advanced video settings and restart. For standalone profiles with an explicit override, the matching value is `XFBToTextureEnable = False` under `[Hacks]` in the data folder’s `user/Config/GFX.ini`. On dev.35 and earlier, the option is called **Photo Album capture**. Take a new photo after enabling the setting if a previous capture was incorrect.
