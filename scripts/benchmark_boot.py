@@ -80,11 +80,13 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                                    f'backend=Vulkan\nfullscreen={str(fullscreen).lower()}\n',
                                    encoding='ascii')
     config = user / 'Config'
-    if dual_core is not None or frame_times or load_state or xfb_copies:
+    if windowed or dual_core is not None or frame_times or load_state or xfb_copies:
         config.mkdir()
     dolphin_settings = f'[Core]\nCPUThread = {dual_core}\n' if dual_core is not None else ''
     if load_state:
         dolphin_settings += '[Interface]\nUsePanicHandlers = False\n'
+    if windowed:
+        dolphin_settings += '[DSP]\nVolume = 5\n'
     if dolphin_settings:
         (config / 'Dolphin.ini').write_text(dolphin_settings, encoding='ascii')
     interval_logs = {}

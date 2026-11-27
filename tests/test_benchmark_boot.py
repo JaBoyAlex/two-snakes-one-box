@@ -25,6 +25,7 @@ class BenchmarkTests(unittest.TestCase):
                 graphics = (work / 'user/Config/GFX.ini').read_text()
                 self.assertIn('[Settings]\nLogRenderTimeToFile = True', graphics)
                 self.assertIn(f'[Hacks]\nXFBToTextureEnable = {texture_only}', graphics)
+                self.assertIn('[DSP]\nVolume = 5\n', (work / 'user/Config/Dolphin.ini').read_text())
                 summary = json.loads((work / 'summary.json').read_text())
                 self.assertEqual(summary['xfb_copies_requested'], mode)
 
@@ -111,3 +112,4 @@ class BenchmarkTests(unittest.TestCase):
             benchmark_boot.benchmark('aot', 'runner', 'disc', 'module', Path(directory),
                                      False, 'Null', 1, None, False)
             self.assertTrue(ranges.keys().isdisjoint(launch.call_args.kwargs['env']))
+            self.assertFalse((Path(directory) / 'user/Config/Dolphin.ini').exists())
