@@ -920,6 +920,23 @@ The CPU figures cover a common 33.166 guest seconds. In the reverse-order pair, 
 
 A separate stock dev.56 Tower A run used the same 1× Vulkan settings and separate threads. Five-second instruction-pointer captures on the two busiest threads covered guest seconds 253.86–259.38 and 259.38–264.91. The symbol map matched the executable's code section byte for byte. The CPU thread had 90 of 321 samples in the native module, 49 in the native dispatch loop and 17 in the instruction fallback hook. The video thread had 139 of 322 samples across the blocking loop, FIFO payload and command-processor status updates, and 25 in vertex flush and framebuffer cache refresh. Two samples landed in the graphics driver. The sampler briefly suspended each thread, and snapshots include waits. These results point to repeated command-processor work as a target for a controlled trial.
 
+### FIFO watermark store trial
+
+A private runner kept the existing FIFO wake-ups and interrupt checks, and skipped video-side writes when the high or low watermark flag already held the requested value. Four Tower A replays used 1× Vulkan, separate threads, unbound host input, and Cubeb on Display 2 at 5% test volume. The same executable ran with the change on and off in both orders.
+
+| Order | Guest-clock progression, control / trial | CPU ms per guest second, control / trial | Maximum vertical blank interval, control / trial | Matching guest DSP |
+| --- | ---: | ---: | ---: | ---: |
+| Control then trial | 80.60% / 99.51% | 2127.90 / 1570.91 | 93.15 / 25.78 ms | 28.079 s |
+| Trial then control | 100.01% / 97.35% | 1831.10 / 1596.60 | 40.58 / 54.60 ms | 32.857 s |
+
+The CPU comparison covers 24.041 guest seconds common to all four runs. All drew about 59.8 frames per guest second and shut down normally. Windows loopback captured 29.99 seconds of output in each run and recorded zero packet discontinuities or valid timestamp gaps above 2 ms. The trial lowered process CPU time by 12.8–26.2% in both pairs. The pacing improvement reversed in the second pair.
+
+Four 52-second flashback replays used 1× Direct3D 11, with one pair per thread mode. The shared pair used 1080.04 and 1007.43 CPU ms per guest second for control and trial over 46.013 matched guest seconds. Slow samples fell from 82 to 40 out of 208 and the maximum vertical blank gap fell from 425.55 to 50.82 ms. The separate pair used 1311.01 and 1271.51 CPU ms per guest second over 51.285 matched guest seconds. Slow samples fell from 40 to 28 out of 208, while the maximum gap rose from 37.42 to 42.11 ms. The shared and separate pairs matched 49.580 and 55.100 seconds of guest DSP output, respectively. The Windows audio captures each reported zero packet discontinuities or valid timestamp gaps above 2 ms.
+
+The default shared-thread Tower A comparison used the same runner and 1× Vulkan for four 25-second captures. In the first order, CPU cost rose from 1019.79 to 1144.37 ms per guest second over 22.372 matched guest seconds. In reverse order it fell from 1698.18 to 1069.02 over 13.330 matched guest seconds. The unchanged control advanced between 55.43% and 100.44% of normal guest speed across its two runs. The trial advanced between 90.98% and 95.31%. Both pairs matched guest DSP, and all four Windows captures reported zero packet discontinuities or valid timestamp gaps above 2 ms. The CPU savings did not repeat in the default mode.
+
+With the trial enabled, two offscreen Vulkan runs repeated the Dock resume and reload sequence 12 times each with shared and separate threads. Each run verified 24 state loads and at least six further presents after every running reload. Both exited normally, with no recurrence of the unknown-instruction fault. The change stayed private pending a repeatable benefit for the default launch.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
