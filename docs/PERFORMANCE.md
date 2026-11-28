@@ -894,6 +894,32 @@ Neutral and A each matched about 25.09 seconds of guest DSP audio against the ea
 
 Four headless dev.56 CLI smoke runs verified the updated report. The 20-second captures shared 6.223 guest seconds and recorded 29.89–30.07 new draws and presents per guest second. All four stopped normally. In the initial eight-second test, the slower capture ended before the first guest tick measured by the faster one.
 
+### Dev.56 threading at default resolution
+
+Order-reversed windowed replays used dev.56 with accurate framebuffer copies, normal process priority, unbound host input, Cubeb, and the same shader cache seed within each scene. Tower A used Vulkan for 40 seconds per run. The flashback used Direct3D 11 for 55 seconds per run. Both played on Display 2 at 5% private test volume. The CPU figures cover all runner threads within a common guest interval per scene.
+
+| Scene and order | Guest-clock progression, shared / separate | CPU ms per guest second, shared / separate | Samples below 95%, shared / separate | Matching guest DSP |
+| --- | ---: | ---: | --- | ---: |
+| Tower A, shared then separate | 91.50% / 98.79% | 1135.15 / 1816.14 | 120/160 / 19/160 | 39.937 s |
+| Tower A, separate then shared | 96.49% / 92.28% | 1054.14 / 1699.41 | 45/160 / 96/160 | 40.537 s |
+| Flashback, shared then separate | 98.49% / 93.31% | 1035.68 / 1423.47 | 35/220 / 97/219 | 55.072 s |
+| Flashback, separate then shared | 88.07% / 95.58% | 1172.45 / 1395.28 | 145/220 / 78/220 | 52.151 s |
+
+Over 36.320 matched guest seconds, Tower A drew about 59.9 frames per guest second in every run. The flashback drew about 34.2 over 48.165 matched guest seconds. All eight Windows captures reported zero packet discontinuities or valid timestamp gaps above 2 ms, and all runs exited normally. Separate threads used 60–61% more process CPU time in Tower A and 19–37% more in the flashback. The pacing advantage reversed with run order in both scenes. These results support retaining shared threads as the default.
+
+### Empty FIFO sleep trial
+
+A private runner let the nondeterministic video thread sleep after draining the FIFO. New FIFO data and asynchronous requests already wake that thread. The comparison used the same instrumented executable with the trial off and on. All four runs used separate threads, 1× Vulkan, Tower A, a seeded shader cache and Windows audio capture.
+
+| Order | CPU ms per guest second, control / trial | Empty polls, control / trial | Maximum vertical blank interval, control / trial | Matching guest DSP |
+| --- | ---: | ---: | ---: | ---: |
+| Control then trial | 1949.65 / 1846.63 | 61.17 million / 17,520 | 62.87 / 68.17 ms | 37.435 s |
+| Trial then control | 1806.94 / 1880.09 | 53.54 million / 17,615 | 63.93 / 85.38 ms | 37.174 s |
+
+The CPU figures cover a common 33.166 guest seconds. In the reverse-order pair, short snapshots around guest second 255 measured 754 ms of video-thread CPU time per guest second with the trial and 710 ms in the control. All four Windows captures reported zero packet discontinuities and all four runs exited normally. The trial stayed private because CPU savings reversed and the longest vertical blank interval increased in both pairs.
+
+A separate stock dev.56 Tower A run used the same 1× Vulkan settings and separate threads. Five-second instruction-pointer captures on the two busiest threads covered guest seconds 253.86–259.38 and 259.38–264.91. The symbol map matched the executable's code section byte for byte. The CPU thread had 90 of 321 samples in the native module, 49 in the native dispatch loop and 17 in the instruction fallback hook. The video thread had 139 of 322 samples across the blocking loop, FIFO payload and command-processor status updates, and 25 in vertex flush and framebuffer cache refresh. Two samples landed in the graphics driver. The sampler briefly suspended each thread, and snapshots include waits. These results point to repeated command-processor work as a target for a controlled trial.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
