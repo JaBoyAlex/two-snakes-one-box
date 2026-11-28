@@ -49,6 +49,7 @@
   "patches/recompcore-disc-fst-capacity.patch",
   "patches/recompcore-disc-mount-log.patch",
   "patches/recompcore-empty-gamepad-config.patch",
+  "patches/recompcore-f64-classification.patch",
   "patches/recompcore-fallback-fastmem.patch",
   "patches/recompcore-fallback-linking.patch",
   "patches/recompcore-fixed-dispatch-bounds.patch",

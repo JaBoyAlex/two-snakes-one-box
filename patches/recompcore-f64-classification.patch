@@ -1,0 +1,113 @@
+diff --git a/GXRuntime/src/core/cpu_interpreter_float.c b/GXRuntime/src/core/cpu_interpreter_float.c
+--- a/GXRuntime/src/core/cpu_interpreter_float.c
++++ b/GXRuntime/src/core/cpu_interpreter_float.c
+@@ -380,24 +380,32 @@
+     return f64_value(integral);
+ }
+ 
++static inline bool f64_is_nan(f64 x) {
++    return (f64_bits(x) & 0x7FFFFFFFFFFFFFFFull) > 0x7FF0000000000000ull;
++}
++
++static inline bool f64_is_inf(f64 x) {
++    return (f64_bits(x) & 0x7FFFFFFFFFFFFFFFull) == 0x7FF0000000000000ull;
++}
++
+ FPRes ni_add(CPUState* cpu, f64 a, f64 b) {
+     FPRes result = {a + b, 0};
+ 
+-    if (isnan(result.value)) {
++    if (f64_is_nan(result.value)) {
+         if (is_snan(a) || is_snan(b)) {
+             result.exception = FPSCR_VXSNAN_BIT;
+             set_fp_exception(cpu, FPSCR_VXSNAN_BIT);
+         }
+         clear_fifr(cpu);
+-        if (isnan(a)) { result.value = make_quiet(a); return result; }
+-        if (isnan(b)) { result.value = make_quiet(b); return result; }
++        if (f64_is_nan(a)) { result.value = make_quiet(a); return result; }
++        if (f64_is_nan(b)) { result.value = make_quiet(b); return result; }
+         result.exception = FPSCR_VXISI_BIT;
+         set_fp_exception(cpu, FPSCR_VXISI_BIT);
+         result.value = f64_value(PPC_F64_QNAN_BITS);
+         return result;
+     }
+ 
+-    if (isinf(a) || isinf(b))
++    if (f64_is_inf(a) || f64_is_inf(b))
+         clear_fifr(cpu);
+     return result;
+ }
+@@ -405,21 +413,21 @@
+ FPRes ni_sub(CPUState* cpu, f64 a, f64 b) {
+     FPRes result = {a - b, 0};
+ 
+-    if (isnan(result.value)) {
++    if (f64_is_nan(result.value)) {
+         if (is_snan(a) || is_snan(b)) {
+             result.exception = FPSCR_VXSNAN_BIT;
+             set_fp_exception(cpu, FPSCR_VXSNAN_BIT);
+         }
+         clear_fifr(cpu);
+-        if (isnan(a)) { result.value = make_quiet(a); return result; }
+-        if (isnan(b)) { result.value = make_quiet(b); return result; }
++        if (f64_is_nan(a)) { result.value = make_quiet(a); return result; }
++        if (f64_is_nan(b)) { result.value = make_quiet(b); return result; }
+         result.exception = FPSCR_VXISI_BIT;
+         set_fp_exception(cpu, FPSCR_VXISI_BIT);
+         result.value = f64_value(PPC_F64_QNAN_BITS);
+         return result;
+     }
+ 
+-    if (isinf(a) || isinf(b))
++    if (f64_is_inf(a) || f64_is_inf(b))
+         clear_fifr(cpu);
+     return result;
+ }
+@@ -427,14 +435,14 @@
+ FPRes ni_mul(CPUState* cpu, f64 a, f64 b) {
+     FPRes result = {a * b, 0};
+ 
+-    if (isnan(result.value)) {
++    if (f64_is_nan(result.value)) {
+         if (is_snan(a) || is_snan(b)) {
+             result.exception = FPSCR_VXSNAN_BIT;
+             set_fp_exception(cpu, FPSCR_VXSNAN_BIT);
+         }
+         clear_fifr(cpu);
+-        if (isnan(a)) { result.value = make_quiet(a); return result; }
+-        if (isnan(b)) { result.value = make_quiet(b); return result; }
++        if (f64_is_nan(a)) { result.value = make_quiet(a); return result; }
++        if (f64_is_nan(b)) { result.value = make_quiet(b); return result; }
+         result.exception = FPSCR_VXIMZ_BIT;
+         set_fp_exception(cpu, FPSCR_VXIMZ_BIT);
+         result.value = f64_value(PPC_F64_QNAN_BITS);
+@@ -503,22 +511,22 @@
+         }
+     }
+ 
+-    if (isnan(result.value)) {
++    if (f64_is_nan(result.value)) {
+         if (is_snan(a) || is_snan(b) || is_snan(c)) {
+             result.exception = FPSCR_VXSNAN_BIT;
+             set_fp_exception(cpu, FPSCR_VXSNAN_BIT);
+         }
+         clear_fifr(cpu);
+-        if (isnan(a)) { result.value = make_quiet(a); return result; }
+-        if (isnan(b)) { result.value = make_quiet(b); return result; }
+-        if (isnan(c)) { result.value = make_quiet(c); return result; }
+-        result.exception = isnan(a * c) ? FPSCR_VXIMZ_BIT : FPSCR_VXISI_BIT;
++        if (f64_is_nan(a)) { result.value = make_quiet(a); return result; }
++        if (f64_is_nan(b)) { result.value = make_quiet(b); return result; }
++        if (f64_is_nan(c)) { result.value = make_quiet(c); return result; }
++        result.exception = f64_is_nan(a * c) ? FPSCR_VXIMZ_BIT : FPSCR_VXISI_BIT;
+         set_fp_exception(cpu, result.exception);
+         result.value = f64_value(PPC_F64_QNAN_BITS);
+         return result;
+     }
+ 
+-    if (isinf(a) || isinf(b) || isinf(c))
++    if (f64_is_inf(a) || f64_is_inf(b) || f64_is_inf(c))
+         clear_fifr(cpu);
+     return result;
+ }

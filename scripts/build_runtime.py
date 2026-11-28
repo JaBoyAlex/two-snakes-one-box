@@ -125,6 +125,7 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-empty-gamepad-config.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-win32-display-selection.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-throttle-clock.patch')
+    apply_patch(source / 'vendor/dolphin', 'recompcore-f64-classification.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fallback-fastmem.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fixed-dispatch-bounds.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-fixed-fallback-lookup.patch')

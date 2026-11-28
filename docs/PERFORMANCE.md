@@ -872,7 +872,11 @@ Repeating the comparison in the missing order produced two matched pairs. CPU co
 | Candidate then reference | 943.72 / 927.96 | 1058.91 / 996.40 | 56.206 s |
 | Reference then candidate | 967.96 / 955.55 | 1129.91 / 1060.56 | 55.644 s |
 
-The candidate used 1.3–1.7% less process CPU time across the matched span and 5.9–6.1% less in the late window. All four runs stopped normally. The trial remains private pending windowed pacing, Windows audio and gameplay checks.
+The candidate used 1.3–1.7% less process CPU time across the matched span and 5.9–6.1% less in the late window. All four runs stopped normally.
+
+Four 55-second windowed flashback runs used 4× Direct3D 11, shared CPU and video threads, the same shader cache seed and Cubeb. Over 44.447 matched guest seconds, the candidate used 1116.73 and 1132.15 CPU ms per guest second, compared with 1150.72 and 1185.81 in the corresponding controls. The candidate recorded 266 of 440 samples below 95% game speed, compared with 323 of 440 in the controls. Its longest vertical blank interval was 81.21 ms versus 60.69 ms in the first pair and 59.67 ms versus 104.40 ms in the second. The runs still slowed down at 4×. Both pairs matched at least 51 seconds of guest DSP output. All four Windows loopback captures logged zero packet discontinuities or valid timestamp gaps above 2 ms.
+
+Four 35-second Disc 2 Tower A runs used 4× Vulkan with shared threads and Cubeb. Over 17.654 matched guest seconds, the candidate used 1383.60 and 1278.90 CPU ms per guest second versus 1442.72 and 1300.60 in the corresponding controls. Both pairs matched at least 23.779 seconds of guest DSP output and all four Windows captures reported zero packet discontinuities or valid timestamp gaps above 2 ms. Median game speed ranged from 60.9% to 72.6% while other desktop processes competed for CPU time. The candidate reduced process CPU cost in both orders. These runs leave Tower A pacing open.
 
 ## Tool comparisons
 
