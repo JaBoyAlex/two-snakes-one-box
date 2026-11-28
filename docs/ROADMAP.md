@@ -4,7 +4,7 @@ Work through the gates in order. Runtime fixes and installer tests can overlap o
 
 | Order | Work | Exit evidence |
 | --- | --- | --- |
-| Now | Stabilize the Windows runtime at original timing. Start with sustained CPU cost in Tower A, then replay the affected gameplay and dialogue checkpoints with normal audio. Investigate intermittent long gaps and the earlier guest CPU fault. | Repeatable speed and pacing results on both discs, with crash and timing findings resolved for the release profile. |
+| Now | Stabilize the Windows runtime at original timing. Use the Ocelot introduction and Tower A to measure sustained CPU cost, then replay the affected gameplay and dialogue checkpoints with normal audio. Investigate intermittent long gaps and the earlier guest CPU fault. | Repeatable speed and pacing results on both discs, with crash and timing findings resolved for the release profile. |
 | Next | Validate a complete playthrough and test the installer in RecompLauncher on a clean Windows account. | A full run through both discs, persistent saves across the disc swap and restart, controller reconnect, and install, update and repair inside RecompLauncher. |
 | First stable release | Stage the verified build and check the portable package and release assets. | Completed gameplay and install gates, clean source and license audit, and recorded compatibility limits. |
 | Display update | Finish monitor-native output and validate higher internal resolution. | Matching aspect ratio, HUD, movie and effect behavior across the supported display settings. |
