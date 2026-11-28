@@ -845,6 +845,35 @@ A private SDK trial converted normal single-precision values with the host instr
 
 In four order-reversed 55-second windowed Direct3D 11 replays at 4×, the reference and trial used 1036.78 and 1035.01 CPU ms per guest second in the first pair and 989.94 and 1048.47 in the second. The trial had 75 of 440 samples below 95% speed, compared with 39 of 440 for the reference. Both pairs produced identical guest DSP samples over at least 57 seconds. All four Windows loopback captures reported zero audio discontinuities. The change stayed private because the benchmark showed no repeatable speedup.
 
+### Flashback host instruction sampling
+
+In the original Null-backend traces, hybrid CPU cost rose from 605.2 to 937.2 ms per guest second between guest seconds 95–103 and 131–139. JIT-only cost rose from 399.0 to 500.9 ms over the same intervals. A separate replay per mode sampled the busiest thread for about eight seconds near each interval. The symbol-enabled runner matched the dev.55 packaged executable's code section byte for byte.
+
+| Samples | Hybrid opening | Hybrid late | JIT-only opening | JIT-only late |
+| --- | ---: | ---: | ---: | ---: |
+| All instruction pointers | 514 | 510 | 515 | 513 |
+| Generated native module | 144 | 199 | 0 | 0 |
+| Busiest generated chunk | 29 | 45 | 0 | 0 |
+| Register synchronization in and out of native code | 19 | 31 | 0 | 0 |
+| Framebuffer decoding and shared CRC32 hash routine | 19 | 31 | 25 | 32 |
+
+The sampler briefly suspends the target thread to read its instruction pointer. These counts include snapshots taken during waits and cannot measure exclusive CPU time. The busiest generated chunk and the native register handoff are candidates for targeted experiments. Framebuffer decoding and the shared hash routine showed nearly the same late counts in both modes.
+
+A separate build added source-line tables to the native module and reproduced its code section byte for byte. Of 199 late native-module samples, 16 resolved inside the toolchain's NaN classifier and seven inside its floating-point classifier. In the busiest generated chunk, the 45 samples covered multiple instructions, including paired-single math and guest memory access. The single most sampled source line accounted for three of those samples.
+
+The private classification trial replaced NaN and infinity predicates in four double-precision math helpers with equivalent tests on the input bits. An x64 synthetic test matched the toolchain predicates and host floating-point status in 2,490,368 cases. It covered both signs, signaling and quiet NaNs, infinities, subnormals, all four rounding modes and all combinations of flush-to-zero and denormals-are-zero.
+
+The first unchanged control diverged after 36.855 seconds of aligned guest DSP output and recorded 168 million instruction fallback hook calls before shutdown. Both candidate runs matched earlier reference audio and recorded about 23 million hook calls. The differing control followed a different workload, so its pacing and CPU cost cannot establish a speedup. The cause of the divergent replay remains open.
+
+Repeating the comparison in the missing order produced two matched pairs. CPU cost is in milliseconds per guest second over a common 48.568-second span and over the late eight-second window. Both pairs used the Null backend and shared CPU and video threads.
+
+| Order | Whole span, reference / candidate | Late window, reference / candidate | Matching guest DSP |
+| --- | ---: | ---: | ---: |
+| Candidate then reference | 943.72 / 927.96 | 1058.91 / 996.40 | 56.206 s |
+| Reference then candidate | 967.96 / 955.55 | 1129.91 / 1060.56 | 55.644 s |
+
+The candidate used 1.3–1.7% less process CPU time across the matched span and 5.9–6.1% less in the late window. All four runs stopped normally. The trial remains private pending windowed pacing, Windows audio and gameplay checks.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
