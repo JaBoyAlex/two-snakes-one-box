@@ -1,0 +1,27 @@
+diff --git a/src/runtime/dolphin_runtime.cpp b/src/runtime/dolphin_runtime.cpp
+--- a/src/runtime/dolphin_runtime.cpp
++++ b/src/runtime/dolphin_runtime.cpp
+@@ -518,15 +518,17 @@ void WriteAutomationStatus(const std::filesystem::path& root, ImplT& impl)
+   std::ofstream output(temp_path, std::ios::binary | std::ios::trunc);
+   output << automation::FormatStatus(status);
+   output.close();
++
+   std::error_code ec;
+-  std::filesystem::rename(temp_path, status_path, ec);
+-  if (ec)
++  if (output)
+   {
+-    ec.clear();
+-    std::filesystem::copy_file(temp_path, status_path,
+-                               std::filesystem::copy_options::overwrite_existing, ec);
+-    std::filesystem::remove(temp_path, ec);
++    std::filesystem::rename(temp_path, status_path, ec);
++    if (!ec)
++      return;
+   }
++  // An open reader can block replacement on Windows. Keep its complete snapshot
++  // until the next poll can publish a new one.
++  std::filesystem::remove(temp_path, ec);
+ }
+ 
+ template <typename ImplT>

@@ -122,6 +122,7 @@ def main():
     apply_patch(source, 'moderngekko-twin-snakes-xfb-default.patch')
     apply_patch(source, 'moderngekko-automation-throttle-clock.patch')
     apply_patch(source, 'moderngekko-automation-live-input-status.patch')
+    apply_patch(source, 'moderngekko-automation-atomic-status.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-gamepad-bindings.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-empty-gamepad-config.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-win32-display-selection.patch')

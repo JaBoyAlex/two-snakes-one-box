@@ -956,6 +956,32 @@ Two further offscreen Vulkan runs used the same checkpoint and cache seed. With 
 
 The windowed comparison ran the separate-thread profile first, reversing the order of the two offscreen hybrid runs. Both windowed runs used 1× Vulkan and Cubeb on Display 2 at a private 5% test volume. Over the 24.208 matched guest seconds, overall speed was 89.5% with shared threads and 98.8% with separate threads. Process CPU cost was 1,199 and 1,738 ms per guest second respectively. Samples below 95% fell from 79 to seven out of 112, and the minimum was 70.7% versus 77.4%. The longest vertical blank interval increased from 33.50 to 55.55 ms. Windows loopback captured 28 seconds of output in each run and reported zero packet discontinuities or valid timestamp gaps above 2 ms. The replays matched 29.169 seconds of guest DSP and exited normally. These measurements support testing separate threads further while the remaining pacing dips and earlier guest fault are investigated.
 
+### Native multiply-add inlining
+
+The private module inlined the native multiply-add and subtract helper so the compiler could specialize single-precision calls and eliminate unused scalar exception results in paired-single instructions. The original arithmetic and exception handling ran in both builds. Disassembly confirmed that the paired-single callers no longer called the shared helper. The compiled module grew by 3,072 bytes. Both builds matched all 2,097,152 synthetic instruction results bit for bit, including both destination lanes, guest FPSCR and host SIMD status. The cases included normal values, subnormals, infinities, signaling and quiet NaNs, four rounding modes and all combinations of flush-to-zero and denormals-are-zero. [Clang inlining attributes](https://clang.llvm.org/docs/AttributeReference.html#always-inline-force-inline)
+
+Two order-reversed replay pairs per scene used the same dev.57 runner, 1× offscreen Vulkan, the same shader cache seed for each scene, unbound host input and shared CPU and video threads. CPU time covers all runner threads and the guest-clock interval common to all four runs per scene.
+
+| Scene | Common guest seconds | Process CPU ms per guest second, reference → trial (reference first) | Process CPU ms per guest second, reference → trial (trial first) | Matching guest DSP per pair |
+| --- | ---: | ---: | ---: | ---: |
+| Ocelot introduction | 22.656 | 1,212 → 1,099 | 1,118 → 1,156 | 27.031 s and 28.384 s |
+| Tower A | 26.560 | 1,005 → 949 | 962 → 954 | 31.687 s and 32.802 s |
+
+The Ocelot speed minimum rose from 49.4% to 71.9% in the first pair and from 68.7% to 70.0% in the reverse pair. Total CPU cost in Ocelot reversed direction, while Tower A's pacing improvement also reversed. Draw rates were within 0.05 per guest second within each scene. All eight runs exited normally.
+
+### Native finite-result fast path
+
+A second private SDK trial returned the result immediately when a native add, subtract or fused multiply-add produced a finite value. Infinite and NaN results followed the existing guest exception and status updates. A synthetic test matched all 5,242,880 instruction results across both builds, including destination lane bits, guest FPSCR and host SIMD status. The linked module was the same size as the reference.
+
+The comparison repeated the two order-reversed pairs in each scene with the same 1× offscreen Vulkan settings. All recorded runs exited normally. CPU cost is normalized by the common guest-clock range in each scene.
+
+| Scene | Common guest seconds | Process CPU ms per guest second, reference → trial (reference first) | Process CPU ms per guest second, reference → trial (trial first) | Matching guest DSP per pair |
+| --- | ---: | ---: | ---: | ---: |
+| Ocelot introduction | 24.424 | 1,112 → 1,091 | 1,098 → 1,105 | 29.107 s and 28.851 s |
+| Tower A | 27.678 | 959 → 960 | 976 → 968 | 32.666 s and 32.496 s |
+
+Ocelot's minimum rose from 66.8% to 75.1% in the first pair and from 66.0% to 73.7% in the second. The trial still averaged about 90% game speed for the sampled scene. Tower A's samples below 95% rose from zero to six out of 112 in the first pair and fell from ten to zero in the second. CPU cost varied within roughly 2% on both scenes.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
