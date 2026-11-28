@@ -22,6 +22,7 @@
   "scripts/check_publication.py",
   "scripts/package_windows.py",
   "patches/dolrecomp-win64-llvm-returns.patch",
+  "patches/dolrecomp-windows-reproducible-link.patch",
   "patches/dolrecomp-windows-utf8-paths.patch",
   "patches/moderngekko-auto-gamepad.patch",
   "patches/moderngekko-automation-guest-ticks.patch",

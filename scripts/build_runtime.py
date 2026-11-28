@@ -67,6 +67,7 @@ PATCH_PREREQUISITES = {
     'recompcore-trim-native-chunk-lookup.patch': ('recompcore-verified-virtual-code.patch',),
     'recompcore-fixed-fallback-lookup.patch': ('recompcore-trim-native-chunk-lookup.patch',),
     'recompcore-cache-bat-translation.patch': ('recompcore-cache-instruction-hook.patch',),
+    'dolrecomp-windows-reproducible-link.patch': ('dolrecomp-windows-utf8-paths.patch',),
 }
 
 
@@ -146,7 +147,7 @@ def main():
     apply_patch(source / 'vendor/dolphin', 'recompcore-twin-snakes-idle.patch')
     apply_patch(source / 'vendor/dolphin', 'recompcore-llvm-region-check.patch')
     apply_patch(source / 'vendor/dolphin/DolRecomp', 'dolrecomp-win64-llvm-returns.patch')
-    apply_patch(source / 'vendor/dolphin/DolRecomp', 'dolrecomp-windows-utf8-paths.patch')
+    apply_patch(source / 'vendor/dolphin/DolRecomp', 'dolrecomp-windows-reproducible-link.patch')
     subprocess.run(['cmake', '-S', str(source), '-B', str(build), '-G', 'Ninja',
                     '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_TESTING=OFF',
                     f'-DPython3_EXECUTABLE={os.sys.executable}',

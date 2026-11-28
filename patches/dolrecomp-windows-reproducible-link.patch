@@ -1,0 +1,14 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -262,7 +262,10 @@ if(MSVC)
+     # Use UTF-8 for narrow command-line arguments and filesystem paths.
+     set(dolrecomp_manifest "${CMAKE_CURRENT_SOURCE_DIR}/src/app/dolrecomp.manifest")
+     target_link_options(dolrecomp PRIVATE /MANIFEST:EMBED
+         "/MANIFESTINPUT:${dolrecomp_manifest}")
++    # Setup fingerprints the extractor. Preserve that identity across unchanged relinks.
++    target_link_options(dolrecomp PRIVATE "$<$<CONFIG:Release>:/Brepro>")
++
+     set_property(TARGET dolrecomp APPEND PROPERTY LINK_DEPENDS "${dolrecomp_manifest}")
+ endif()
+ if(DOLRECOMP_ENABLE_LLVM)
