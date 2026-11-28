@@ -94,39 +94,51 @@ def process_cpu_seconds(pid):
 def compare_aligned_cpu(runs):
     if len(runs) < 2:
         return None
+    counters = (('process_cpu_seconds', 'cpu_ms_per_guest_second', 1000),
+                ('frame_count', 'drawn_frames_per_guest_second', 1),
+                ('present_count', 'presents_per_guest_second', 1))
+    fields = ('guest_ticks', *(counter for counter, _, _ in counters))
     series = {}
     clocks = set()
     for name, run in runs.items():
         samples = run['samples']
         clocks.update(sample.get('throttle_clock_hz') for sample in samples)
-        points = [(sample['guest_ticks'], sample['process_cpu_seconds']) for sample in samples
-                  if 'guest_ticks' in sample and 'process_cpu_seconds' in sample]
-        if len(points) < 2 or any(tick < prev_tick or cpu < prev_cpu for
-                                  (prev_tick, prev_cpu), (tick, cpu) in zip(points, points[1:])):
+        points = [sample for sample in samples if all(field in sample for field in fields)]
+        if len(points) < 2 or any(right[field] < left[field]
+                                  for left, right in zip(points, points[1:]) for field in fields):
             return None
         series[name] = points
     if len(clocks) != 1:
         return None
     clock = next(iter(clocks))
-    start = max(points[0][0] for points in series.values())
-    end = min(points[-1][0] for points in series.values())
+    start = max(points[0]['guest_ticks'] for points in series.values())
+    end = min(points[-1]['guest_ticks'] for points in series.values())
     if not clock or clock < 0 or end <= start:
         return None
 
-    def cpu_at_tick(points, tick):
-        index = bisect_left(points, tick, key=lambda point: point[0])
-        right_tick, right_cpu = points[index]
+    def counters_at_tick(points, tick):
+        index = bisect_left(points, tick, key=lambda point: point['guest_ticks'])
+        right = points[index]
+        right_tick = right['guest_ticks']
         if right_tick == tick:
-            return right_cpu
-        left_tick, left_cpu = points[index - 1]
-        return left_cpu + (right_cpu - left_cpu) * (tick - left_tick) / (right_tick - left_tick)
+            return right
+        left = points[index - 1]
+        left_tick = left['guest_ticks']
+        fraction = (tick - left_tick) / (right_tick - left_tick)
+        return {counter: left[counter] + (right[counter] - left[counter]) * fraction
+                for counter, _, _ in counters}
 
     guest_seconds = (end - start) / clock
-    return {'guest_tick_range': {'start': start, 'end': end},
-            'guest_seconds': round(guest_seconds, 6),
-            'cpu_ms_per_guest_second': {
-                name: round((cpu_at_tick(points, end) - cpu_at_tick(points, start)) * 1000 / guest_seconds, 3)
-                for name, points in series.items()}}
+    result = {'guest_tick_range': {'start': start, 'end': end},
+              'guest_seconds': round(guest_seconds, 6)}
+    for _, metric, _ in counters:
+        result[metric] = {}
+    for name, points in series.items():
+        first = counters_at_tick(points, start)
+        last = counters_at_tick(points, end)
+        for counter, metric, scale in counters:
+            result[metric][name] = round((last[counter] - first[counter]) * scale / guest_seconds, 3)
+    return result
 
 
 def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load_state, dispatch_samples,
@@ -144,8 +156,10 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                                    f'backend=Vulkan\nfullscreen={str(fullscreen).lower()}\n',
                                    encoding='ascii')
     config = user / 'Config'
-    if windowed or dual_core is not None or frame_times or load_state or xfb_copies:
-        config.mkdir()
+    config.mkdir()
+    (config / 'GCPadNew.ini').write_text(
+        ''.join(f'[GCPad{port}]\nDevice = Replay/0/Unbound\n' for port in range(1, 5)),
+        encoding='ascii')
     dolphin_settings = f'[Core]\nCPUThread = {dual_core}\n' if dual_core is not None else ''
     if load_state:
         dolphin_settings += '[Interface]\nUsePanicHandlers = False\n'

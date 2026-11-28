@@ -38,9 +38,9 @@ The tester reported better pacing, including intervals close to normal speed, wi
 python scripts/benchmark_boot.py --data .local/player --runner .local/runtime/moderngekko-run.exe
 ```
 
-Use an idle machine and the same disc and scene for comparisons. Pass `--disc 2 --load-state PATH` for a checkpoint captured on Disc 2. The default headless run isolates the CPU path. `--offscreen Vulkan` (also `--offscreen-vulkan`) exercises rendering without a visible window or audio. `--windowed` adds display presentation and normal audio with Vulkan by default. Pass `D3D` for Direct3D 11 or `D3D12` for Direct3D 12 to either option. `--dual-core` enables separate CPU and video threads in the isolated benchmark profile. Add `--frame-times` to a windowed run for median, 95th-percentile and maximum render and vertical blank intervals after warmup. Runtime presents can include multiple presentations of the same frame. These intervals measure runtime events. Use OS-level tracing to measure when frames reach the display. Generated outputs, logs and capture files stay local.
+Use an idle machine and the same disc and scene for comparisons. Automated benchmark profiles leave the emulated pads unbound from host devices. Pass `--disc 2 --load-state PATH` for a checkpoint captured on Disc 2. The default headless run isolates the CPU path. `--offscreen Vulkan` (also `--offscreen-vulkan`) exercises rendering without a visible window or audio. `--windowed` adds display presentation and normal audio with Vulkan by default. Pass `D3D` for Direct3D 11 or `D3D12` for Direct3D 12 to either option. `--dual-core` enables separate CPU and video threads in the isolated benchmark profile. Add `--frame-times` to a windowed run for median, 95th-percentile and maximum render and vertical blank intervals after warmup. Runtime presents can include multiple presentations of the same frame. These intervals measure runtime events. Use OS-level tracing to measure when frames reach the display. Generated outputs, logs and capture files stay local.
 
-On Windows, add `--compare-cpu --process-cpu` to replay the same checkpoint in hybrid and JIT-only modes in both run orders. The benchmark samples total process CPU time across all threads. If the replays share a guest clock rate and overlap, `cpu-comparison.json` reports CPU milliseconds per guest second over their common range. The same sampling option works with the runner, module, backend, scale and threading comparisons.
+On Windows, add `--compare-cpu --process-cpu` to replay the same checkpoint in hybrid and JIT-only modes in both run orders. The benchmark samples total process CPU time across all threads. If the replays share a guest clock rate and overlap, `cpu-comparison.json` reports CPU milliseconds, new draws and presentation callbacks per guest second over that common range. Check the draw and present rates alongside CPU cost. A scene change can alter those rates even with the same guest clock. The same sampling option works with the runner, module, backend, scale and threading comparisons.
 
 The benchmark reports startup time from process launch to the first poll that observes a running core and an advanced frame counter. For a replay it also reports when the runtime confirms the checkpoint load. A failed load produces no replay samples. Rendered frames and runtime presents use counter changes across the full measurement window, which reduces the effect of the status-file write interval on measured rates. Use these measurements alongside game speed when comparing shader warmup or video backends.
 
@@ -863,7 +863,7 @@ A separate build added source-line tables to the native module and reproduced it
 
 The private classification trial replaced NaN and infinity predicates in four double-precision math helpers with equivalent tests on the input bits. An x64 synthetic test matched the toolchain predicates and host floating-point status in 2,490,368 cases. It covered both signs, signaling and quiet NaNs, infinities, subnormals, all four rounding modes and all combinations of flush-to-zero and denormals-are-zero.
 
-The first unchanged control diverged after 36.855 seconds of aligned guest DSP output and recorded 168 million instruction fallback hook calls before shutdown. Both candidate runs matched earlier reference audio and recorded about 23 million hook calls. The differing control followed a different workload, so its pacing and CPU cost cannot establish a speedup. The cause of the divergent replay remains open.
+The first unchanged control diverged after 36.855 seconds of aligned guest DSP output and recorded 168 million instruction fallback hook calls before shutdown. Both candidate runs matched earlier reference audio and recorded about 23 million hook calls. The differing control followed a different workload, so its pacing and CPU cost cannot establish a speedup. A later Start input reproduced its draw cadence and fallback signature. See the [replay check](#flashback-replay-input-check).
 
 Repeating the comparison in the missing order produced two matched pairs. CPU cost is in milliseconds per guest second over a common 48.568-second span and over the late eight-second window. Both pairs used the Null backend and shared CPU and video threads.
 
@@ -877,6 +877,22 @@ The candidate used 1.3–1.7% less process CPU time across the matched span and 
 Four 55-second windowed flashback runs used 4× Direct3D 11, shared CPU and video threads, the same shader cache seed and Cubeb. Over 44.447 matched guest seconds, the candidate used 1116.73 and 1132.15 CPU ms per guest second, compared with 1150.72 and 1185.81 in the corresponding controls. The candidate recorded 266 of 440 samples below 95% game speed, compared with 323 of 440 in the controls. Its longest vertical blank interval was 81.21 ms versus 60.69 ms in the first pair and 59.67 ms versus 104.40 ms in the second. The runs still slowed down at 4×. Both pairs matched at least 51 seconds of guest DSP output. All four Windows loopback captures logged zero packet discontinuities or valid timestamp gaps above 2 ms.
 
 Four 35-second Disc 2 Tower A runs used 4× Vulkan with shared threads and Cubeb. Over 17.654 matched guest seconds, the candidate used 1383.60 and 1278.90 CPU ms per guest second versus 1442.72 and 1300.60 in the corresponding controls. Both pairs matched at least 23.779 seconds of guest DSP output and all four Windows captures reported zero packet discontinuities or valid timestamp gaps above 2 ms. Median game speed ranged from 60.9% to 72.6% while other desktop processes competed for CPU time. The candidate reduced process CPU cost in both orders. These runs leave Tower A pacing open.
+
+### Flashback replay input check
+
+Three dev.55 replays used a checkpoint captured just before the audio divergence, the Null backend, shared threads and unbound physical pads. Each ran through guest second 141. One received neutral input and the other two received six fields of Start or A around guest second 124. Both scripted commands completed.
+
+| Replay | New draws per guest second over 10.527 matched seconds | Instruction fallback hook calls through shutdown |
+| --- | ---: | ---: |
+| Earlier divergent run | 59.655 | 167.79 million |
+| Earlier matching control | 35.739 | 22.93 million |
+| Neutral replay | 35.622 | 10.18 million |
+| A press | 35.741 | 10.18 million |
+| Start press | 59.663 | 164.41 million |
+
+Neutral and A each matched about 25.09 seconds of guest DSP audio against the earlier matching control. Start and the divergent run each recorded 131 code verifications and one failed chunk at shutdown. Their draw rates agreed within 0.01 frames per guest second. The totals include different replay lengths. The scripted Start press reproduced the skip workload. The source of the input in the earlier run remains unverified. Automated benchmark profiles now leave gamepad bindings unbound and report aligned draw and present rates with CPU time.
+
+Four headless dev.56 CLI smoke runs verified the updated report. The 20-second captures shared 6.223 guest seconds and recorded 29.89–30.07 new draws and presents per guest second. All four stopped normally. In the initial eight-second test, the slower capture ended before the first guest tick measured by the faster one.
 
 ## Tool comparisons
 

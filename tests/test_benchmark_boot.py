@@ -14,18 +14,21 @@ class BenchmarkTests(unittest.TestCase):
     def test_cpu_comparison_aligns_guest_time_across_replays(self):
         def run(points):
             return {'samples': [{'guest_ticks': tick, 'process_cpu_seconds': cpu,
-                                 'throttle_clock_hz': 100} for tick, cpu in points]}
+                                 'throttle_clock_hz': 100, 'frame_count': frames, 'present_count': presents}
+                                for tick, cpu, frames, presents in points]}
 
-        runs = {'reference': run([(100, 1.0), (300, 3.0)]),
-                'candidate': run([(150, 5.0), (250, 5.5)])}
+        runs = {'reference': run([(100, 1.0, 20, 40), (300, 3.0, 80, 160)]),
+                'candidate': run([(150, 5.0, 100, 200), (250, 5.5, 160, 260)])}
         self.assertEqual(benchmark_boot.compare_aligned_cpu(runs), {
             'guest_tick_range': {'start': 150, 'end': 250},
             'guest_seconds': 1.0,
             'cpu_ms_per_guest_second': {'reference': 1000.0, 'candidate': 500.0},
+            'drawn_frames_per_guest_second': {'reference': 30.0, 'candidate': 60.0},
+            'presents_per_guest_second': {'reference': 60.0, 'candidate': 60.0},
         })
         runs['candidate']['samples'][1]['throttle_clock_hz'] = 200
         self.assertIsNone(benchmark_boot.compare_aligned_cpu(runs))
-        runs['candidate'] = run([(350, 5.0), (450, 5.5)])
+        runs['candidate'] = run([(350, 5.0, 100, 200), (450, 5.5, 160, 260)])
         self.assertIsNone(benchmark_boot.compare_aligned_cpu(runs))
 
     def test_compare_scale_runs_in_both_orders_with_the_same_backend(self):
@@ -144,7 +147,7 @@ class BenchmarkTests(unittest.TestCase):
                     self.assertNotIn('guest_tick_range', summary)
                     self.assertNotIn('throttle_clocks_hz', summary)
 
-    def test_ignores_fallback_ranges_in_inherited_environment(self):
+    def test_isolates_host_input_and_inherited_fallback_ranges(self):
         ranges = dict.fromkeys(('STATICRECOMP_FALLBACK_RANGES',
                                'STATICRECOMP_PROFILE_FALLBACK_RANGES'), '100-200')
         with (TemporaryDirectory() as directory, patch.dict(os.environ, ranges),
@@ -155,4 +158,8 @@ class BenchmarkTests(unittest.TestCase):
             benchmark_boot.benchmark('aot', 'runner', 'disc', 'module', Path(directory),
                                      False, 'Null', 1, None, False)
             self.assertTrue(ranges.keys().isdisjoint(launch.call_args.kwargs['env']))
-            self.assertFalse((Path(directory) / 'user/Config/Dolphin.ini').exists())
+            config = Path(directory) / 'user/Config'
+            self.assertFalse((config / 'Dolphin.ini').exists())
+            self.assertEqual((config / 'GCPadNew.ini').read_text(encoding='ascii').splitlines(),
+                             [line for port in range(1, 5)
+                              for line in (f'[GCPad{port}]', 'Device = Replay/0/Unbound')])
