@@ -937,6 +937,12 @@ The default shared-thread Tower A comparison used the same runner and 1× Vulkan
 
 With the trial enabled, two offscreen Vulkan runs repeated the Dock resume and reload sequence 12 times each with shared and separate threads. Each run verified 24 state loads and at least six further presents after every running reload. Both exited normally, with no recurrence of the unknown-instruction fault. The change stayed private pending a repeatable benefit for the default launch.
 
+### Ocelot introduction slowdown
+
+The packaged dev.57 build reached Ocelot's introduction after loading a pre-fight memory card in a fresh process, with 1× headless Vulkan and shared CPU and video threads. Across 194.47 host seconds the guest clock advanced 169.92 seconds (87.4% overall) and the runner logged 8,205 present callbacks. The first eight windows of about five seconds averaged at least 99.6% speed. Later windows fell as low as 67.1%, and 26 of the 38 complete windows fell below 95%. One eight-second CPU sample falls inside the capture. The reported minimum precedes it.
+
+The sampler briefly suspended the busiest thread to read its instruction pointer. The matching runner symbol map was verified against the package's executable code section. Of 513 samples in the later intro, 168 landed in the generated boot module, 84 in private memory, and 203 in the runner. The runner samples included 27 in native register synchronization and 22 in the SSE4.2 texture hash. Separately, 26 samples landed in the Nvidia driver. This is one live capture. Comparing hybrid and JIT-only modes over the same guest interval is needed to attribute the speed loss.
+
 ## Tool comparisons
 
 I compared public GitHub release asset downloads on November 23, 2026. These totals count binary and installer downloads across available versions and platforms. They exclude source archives, resource packs, and projects whose releases use another platform's game executable. Repeated downloads are possible. The figures describe the sampled projects and exclude distribution outside GitHub.
