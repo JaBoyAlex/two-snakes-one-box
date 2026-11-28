@@ -37,6 +37,8 @@ Windows x64 is the first target. Linux and macOS packaging will follow verified 
 
 ## Resolution and frame rate
 
+In RecompLauncher, open **Game Settings → Video → Monitor** to choose where the game opens. **Default display** uses the Windows primary display. Your selection applies on the next launch. [Display settings guide](docs/BUILDING.md)
+
 The development build offers higher internal render scales and borderless fullscreen at the monitor's desktop resolution. The display tests still need broader monitor, DPI, HUD and effects coverage. Uncapped rendering follows baseline stability and must preserve movement speed, animation, physics, audio and cutscene timing. NVIDIA Reflex, DLSS and DLAA follow the renderer work. [Performance measurements and tool comparisons](docs/PERFORMANCE.md)
 
 ## Files and saves

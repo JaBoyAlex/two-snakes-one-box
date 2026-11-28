@@ -11,6 +11,23 @@ import benchmark_boot
 
 
 class BenchmarkTests(unittest.TestCase):
+    def test_cpu_comparison_aligns_guest_time_across_replays(self):
+        def run(points):
+            return {'samples': [{'guest_ticks': tick, 'process_cpu_seconds': cpu,
+                                 'throttle_clock_hz': 100} for tick, cpu in points]}
+
+        runs = {'reference': run([(100, 1.0), (300, 3.0)]),
+                'candidate': run([(150, 5.0), (250, 5.5)])}
+        self.assertEqual(benchmark_boot.compare_aligned_cpu(runs), {
+            'guest_tick_range': {'start': 150, 'end': 250},
+            'guest_seconds': 1.0,
+            'cpu_ms_per_guest_second': {'reference': 1000.0, 'candidate': 500.0},
+        })
+        runs['candidate']['samples'][1]['throttle_clock_hz'] = 200
+        self.assertIsNone(benchmark_boot.compare_aligned_cpu(runs))
+        runs['candidate'] = run([(350, 5.0), (450, 5.5)])
+        self.assertIsNone(benchmark_boot.compare_aligned_cpu(runs))
+
     def test_compare_scale_runs_in_both_orders_with_the_same_backend(self):
         with TemporaryDirectory() as directory:
             work = Path(directory)

@@ -40,6 +40,8 @@ python scripts/benchmark_boot.py --data .local/player --runner .local/runtime/mo
 
 Use an idle machine and the same disc and scene for comparisons. Pass `--disc 2 --load-state PATH` for a checkpoint captured on Disc 2. The default headless run isolates the CPU path. `--offscreen Vulkan` (also `--offscreen-vulkan`) exercises rendering without a visible window or audio. `--windowed` adds display presentation and normal audio with Vulkan by default. Pass `D3D` for Direct3D 11 or `D3D12` for Direct3D 12 to either option. `--dual-core` enables separate CPU and video threads in the isolated benchmark profile. Add `--frame-times` to a windowed run for median, 95th-percentile and maximum render and vertical blank intervals after warmup. Runtime presents can include multiple presentations of the same frame. These intervals measure runtime events. Use OS-level tracing to measure when frames reach the display. Generated outputs, logs and capture files stay local.
 
+On Windows, add `--compare-cpu --process-cpu` to replay the same checkpoint in hybrid and JIT-only modes in both run orders. The benchmark samples total process CPU time across all threads. If the replays share a guest clock rate and overlap, `cpu-comparison.json` reports CPU milliseconds per guest second over their common range. The same sampling option works with the runner, module, backend, scale and threading comparisons.
+
 The benchmark reports startup time from process launch to the first poll that observes a running core and an advanced frame counter. For a replay it also reports when the runtime confirms the checkpoint load. A failed load produces no replay samples. Rendered frames and runtime presents use counter changes across the full measurement window, which reduces the effect of the status-file write interval on measured rates. Use these measurements alongside game speed when comparing shader warmup or video backends.
 
 Use `--compare-threading` to run shared and separate CPU/video threads in both orders against the same runner and checkpoint. It defaults to hybrid execution. With `--shader-cache-seed PATH`, every run starts with its own copy of the supplied local `Cache` directory. Seed from a completed run with the same backend and GPU so each case starts with the same pipeline data.
@@ -824,6 +826,24 @@ The dev.54 packaged runtime replayed Tower A at 4× Vulkan and the Underground P
 A private SDK trial loaded both unquantized paired-single lanes in one read when the entire eight-byte range was in guest RAM. The existing per-lane path handled external memory, boundary crossings, single-lane loads and quantized or disabled instructions. A synthetic comparison matched both result lanes and callback counts in 800,035 cases.
 
 Four order-reversed 55-second replays compared native modules from the same generated input and pinned compiler at 4× Direct3D 11. Across 50.470 seconds of matched guest time, the trial used 998.20 and 996.34 ms of process CPU time per guest second. The controls used 998.48 and 985.34 ms. The candidate had 41 of 439 samples below 95%, compared with 66 of 440 for the controls. All four Windows captures reported zero audio discontinuities. The two matched guest DSP comparisons were sample-identical for 57.401 and 58.157 seconds. The CPU savings did not repeat across run orders, so the load change stayed private.
+
+### Dev.55 flashback CPU cost by renderer
+
+The dev.55 package replayed the same Underground Passage state in hybrid and JIT-only modes with shared CPU and video threads. Each backend used isolated profiles. The Direct3D 11 and Vulkan runs used 4× internal resolution offscreen. CPU time includes all runner threads and is normalized over matching guest clock intervals. The slow sample counts use a 95% speed threshold.
+
+| Backend | Matched guest seconds | Hybrid / JIT CPU ms per guest second | Hybrid / JIT CPU ms per guest second, final 12 seconds | Slow samples, hybrid / JIT | Matching guest DSP |
+| --- | ---: | ---: | ---: | --- | ---: |
+| Null | 51.718 | 831.7 / 453.8 | 926.6 / 498.3 | 1/208 / 0/208 | 55.830 s |
+| Direct3D 11 | 51.735 | 919.0 / 552.3 | 1054.3 / 621.4 | 5/207 / 0/208 | 55.727 s |
+| Vulkan | 51.618 | 845.4 / 479.3 | 925.0 / 519.2 | 1/208 / 0/208 | 55.599 s |
+
+The hybrid path used 66–83% more CPU time across the matched spans, including when rendering was disabled. The paired DSP samples were identical. These runs used headless audio and did not measure Windows audio output. The next profiling target is CPU work within the hybrid path during the final stretch.
+
+The order-reversed benchmark command also completed four short offscreen Direct3D 11 replays. Across their common 10.310-second guest interval, hybrid used 810–872 CPU ms per guest second and JIT-only used 552–586. One hybrid run showed a 0.51-second gap between sampled presentation changes. All four stopped normally.
+
+A private SDK trial converted normal single-precision values with the host instruction and kept the existing software path for zero, subnormal, infinity and NaN. Its results matched all 4,294,967,296 input bit patterns on x64 with flush-to-zero and denormals-are-zero enabled. [BlueWake's related implementation](https://github.com/chrissotraidis/bluewake/pull/228)
+
+In four order-reversed 55-second windowed Direct3D 11 replays at 4×, the reference and trial used 1036.78 and 1035.01 CPU ms per guest second in the first pair and 989.94 and 1048.47 in the second. The trial had 75 of 440 samples below 95% speed, compared with 39 of 440 for the reference. Both pairs produced identical guest DSP samples over at least 57 seconds. All four Windows loopback captures reported zero audio discontinuities. The change stayed private because the benchmark showed no repeatable speedup.
 
 ## Tool comparisons
 

@@ -1,5 +1,6 @@
 """Benchmark CPU modes, graphics backends, runners and modules in isolated profiles."""
 import argparse
+from bisect import bisect_left
 import json
 import math
 import os
@@ -66,9 +67,72 @@ def summarize_counter_pauses(samples, counter):
     return {'longest_seconds': round(longest, 2), 'ending_seconds': round(tail, 2)}
 
 
+def process_cpu_seconds(pid):
+    import ctypes
+    from ctypes import wintypes
+
+    kernel = ctypes.windll.kernel32
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+    handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return None
+    try:
+        created, exited, kernel_time, user_time = [wintypes.FILETIME() for _ in range(4)]
+        if not kernel.GetProcessTimes(handle, ctypes.byref(created), ctypes.byref(exited),
+                                      ctypes.byref(kernel_time), ctypes.byref(user_time)):
+            return None
+        kernel_ticks = (kernel_time.dwHighDateTime << 32) | kernel_time.dwLowDateTime
+        user_ticks = (user_time.dwHighDateTime << 32) | user_time.dwLowDateTime
+        return (kernel_ticks + user_ticks) / 10_000_000
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def compare_aligned_cpu(runs):
+    if len(runs) < 2:
+        return None
+    series = {}
+    clocks = set()
+    for name, run in runs.items():
+        samples = run['samples']
+        clocks.update(sample.get('throttle_clock_hz') for sample in samples)
+        points = [(sample['guest_ticks'], sample['process_cpu_seconds']) for sample in samples
+                  if 'guest_ticks' in sample and 'process_cpu_seconds' in sample]
+        if len(points) < 2 or any(tick < prev_tick or cpu < prev_cpu for
+                                  (prev_tick, prev_cpu), (tick, cpu) in zip(points, points[1:])):
+            return None
+        series[name] = points
+    if len(clocks) != 1:
+        return None
+    clock = next(iter(clocks))
+    start = max(points[0][0] for points in series.values())
+    end = min(points[-1][0] for points in series.values())
+    if not clock or clock < 0 or end <= start:
+        return None
+
+    def cpu_at_tick(points, tick):
+        index = bisect_left(points, tick, key=lambda point: point[0])
+        right_tick, right_cpu = points[index]
+        if right_tick == tick:
+            return right_cpu
+        left_tick, left_cpu = points[index - 1]
+        return left_cpu + (right_cpu - left_cpu) * (tick - left_tick) / (right_tick - left_tick)
+
+    guest_seconds = (end - start) / clock
+    return {'guest_tick_range': {'start': start, 'end': end},
+            'guest_seconds': round(guest_seconds, 6),
+            'cpu_ms_per_guest_second': {
+                name: round((cpu_at_tick(points, end) - cpu_at_tick(points, start)) * 1000 / guest_seconds, 3)
+                for name, points in series.items()}}
+
+
 def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load_state, dispatch_samples,
               *, dual_core=None, frame_times=False, internal_scale=1, fullscreen=False,
-              alternate_disc=None, shader_cache_seed=None, xfb_copies=None, window_position=None):
+              alternate_disc=None, shader_cache_seed=None, xfb_copies=None, window_position=None,
+              sample_cpu=False):
     control = work / 'control'
     command_dir = control / 'commands'
     command_dir.mkdir(parents=True)
@@ -179,6 +243,10 @@ def benchmark(mode, runner, game, module, work, windowed, backend, seconds, load
                         sample['guest_ticks'] = guest_ticks
                     if throttle_clock is not None:
                         sample['throttle_clock_hz'] = throttle_clock
+                    if sample_cpu:
+                        cpu_time = process_cpu_seconds(process.pid)
+                        if cpu_time is not None:
+                            sample['process_cpu_seconds'] = cpu_time
                     if windowed:
                         sample.update({'vps': vps, 'fps': fps})
                     samples.append(sample)
@@ -265,6 +333,8 @@ def main():
                             help='Compare a candidate against --runner in both run orders')
     comparison.add_argument('--compare-threading', action='store_true',
                             help='Compare shared and separate CPU/video threads in both run orders')
+    comparison.add_argument('--compare-cpu', action='store_true',
+                            help='Compare hybrid AOT and JIT-only in both run orders')
     comparison.add_argument('--compare-backend', choices=backends,
                             help='Compare another graphics backend in both run orders')
     comparison.add_argument('--compare-scale', type=int, metavar='N',
@@ -273,6 +343,8 @@ def main():
                         help='Boot the selected prepared disc (default: 1)')
     parser.add_argument('--load-state', type=Path, help='Replay a local save state for the selected disc')
     parser.add_argument('--dispatch-samples', action='store_true', help='Log the busiest native dispatch sites on shutdown')
+    parser.add_argument('--process-cpu', action='store_true',
+                        help='Sample Windows process CPU time and compare matching guest clock intervals')
     parser.add_argument('--output', type=Path,
                         help='Directory for isolated profiles and logs (default: system temporary directory)')
     parser.add_argument('--seconds', type=int, default=20)
@@ -308,6 +380,10 @@ def main():
         parser.error('--compare-runner requires a single CPU mode')
     if args.compare_threading and (args.dual_core or args.mode == 'both'):
         parser.error('--compare-threading requires a single CPU mode and cannot be combined with --dual-core')
+    if args.compare_cpu and args.mode not in (None, 'both'):
+        parser.error('--compare-cpu uses both CPU modes')
+    if args.process_cpu and os.name != 'nt':
+        parser.error('--process-cpu is available on Windows')
     backend = args.windowed or args.offscreen or 'Null'
     if args.compare_backend and (backend in ('Null', args.compare_backend) or args.mode == 'both'):
         parser.error('--compare-backend requires a different --windowed or --offscreen backend and a single CPU mode')
@@ -358,6 +434,10 @@ def main():
                  ('separate-second', mode, runner, module, True, backend, args.internal_scale),
                  ('separate-first', mode, runner, module, True, backend, args.internal_scale),
                  ('shared-second', mode, runner, module, False, backend, args.internal_scale)]
+    elif args.compare_cpu:
+        cases = [(f'{mode}-{order}', mode, runner, module, args.dual_core, backend, args.internal_scale)
+                 for mode, order in [('aot', 'first'), ('jit', 'second'),
+                                     ('jit', 'first'), ('aot', 'second')]]
     elif args.compare_backend:
         mode = args.mode or 'aot'
         cases = [(f'{graphics.lower()}-{order}', mode, runner, module, args.dual_core, graphics, args.internal_scale)
@@ -380,7 +460,16 @@ def main():
                                   frame_times=args.frame_times, internal_scale=scale,
                                   fullscreen=args.fullscreen, alternate_disc=alternate_disc,
                                   shader_cache_seed=shader_cache_seed, xfb_copies=args.xfb_copies,
-                                  window_position=args.window_position))
+                                  window_position=args.window_position, sample_cpu=args.process_cpu))
+    if args.process_cpu and all(outcomes) and len(cases) > 1:
+        runs = {case[0]: json.loads((work / case[0] / 'summary.json').read_text(encoding='utf-8'))
+                for case in cases}
+        aligned = compare_aligned_cpu(runs)
+        if aligned is None:
+            print('No comparable guest clock interval for process CPU samples.')
+        else:
+            (work / 'cpu-comparison.json').write_text(json.dumps(aligned, indent=2) + '\n', encoding='utf-8')
+            print(json.dumps(aligned))
     print(f'Private logs and samples: {work}')
     return 0 if all(outcomes) else 1
 
